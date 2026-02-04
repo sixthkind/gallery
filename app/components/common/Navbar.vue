@@ -60,17 +60,19 @@
             </div>
             <a
               href="/albums"
-              class="hidden md:inline-flex bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 hover:bg-opacity-90 transition-colors"
+              class="hidden md:inline-flex items-center gap-2 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border px-3 py-2 hover:bg-opacity-90 transition-colors"
               title="Albums"
             >
               <Icon name="heroicons:rectangle-stack" class="w-5 h-5 text-gray-700" />
+              <span class="font-bold text-slate-500">Albums</span>
             </a>
             <a
               href="/tags"
-              class="hidden md:inline-flex bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 hover:bg-opacity-90 transition-colors"
+              class="hidden md:inline-flex items-center gap-2 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border px-3 py-2 hover:bg-opacity-90 transition-colors"
               title="Tags"
             >
               <Icon name="heroicons:tag" class="w-5 h-5 text-gray-700" />
+              <span class="font-bold text-slate-500">Tags</span>
             </a>
 
             <div v-if="pb.authStore.isValid" class="hidden md:flex bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 flex items-center">
