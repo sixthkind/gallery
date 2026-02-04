@@ -1,6 +1,6 @@
 <script setup>
 import { pb } from '#imports';
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 definePageMeta({});
@@ -11,6 +11,28 @@ const tags = ref([]);
 const loading = ref(true);
 const skeletonPills = ref([]);
 
+const maxTagCount = computed(() => {
+  return tags.value.reduce((max, tag) => {
+    const count = typeof tag.photoCount === 'number' ? tag.photoCount : 0;
+    return Math.max(max, count);
+  }, 0);
+});
+
+const getTagStyle = (tag) => {
+  const count = typeof tag?.photoCount === 'number' ? tag.photoCount : 0;
+  const max = maxTagCount.value;
+  const ratio = max > 1 ? Math.max(0, Math.min(1, (count - 1) / (max - 1))) : 0;
+  const glow = { r: 196, g: 181, b: 253 }; // Tailwind purple-400
+  const borderAlpha = 0.2 + ratio * 0.7;
+  const glowAlpha = 0.1 + ratio * 0.5;
+  const glowSize = 4 + ratio * 12;
+  return {
+    backgroundColor: '#ffffff',
+    borderColor: ratio > 0 ? `rgba(${glow.r}, ${glow.g}, ${glow.b}, ${borderAlpha})` : 'rgb(226, 232, 240)',
+    boxShadow: ratio > 0 ? `0 0 ${glowSize}px rgba(${glow.r}, ${glow.g}, ${glow.b}, ${glowAlpha})` : 'none'
+  };
+};
+
 const buildSkeletonPills = () => {
   skeletonPills.value = Array.from({ length: 30 }, () => {
     return Math.floor(70 + Math.random() * 110);
@@ -20,9 +42,23 @@ const buildSkeletonPills = () => {
 const fetchTags = async () => {
   loading.value = true;
   try {
-    tags.value = await pb.collection('tags').getFullList({
-      sort: 'name'
+    const [tagRecords, photoRecords] = await Promise.all([
+      pb.collection('tags').getFullList({ sort: 'name' }),
+      pb.collection('photos').getFullList({ fields: 'id,tags' })
+    ]);
+
+    const counts = new Map();
+    photoRecords.forEach(photo => {
+      const photoTags = Array.isArray(photo.tags) ? photo.tags : [];
+      photoTags.forEach(tagId => {
+        counts.set(tagId, (counts.get(tagId) || 0) + 1);
+      });
     });
+
+    tags.value = tagRecords.map(tag => ({
+      ...tag,
+      photoCount: counts.get(tag.id) || 0
+    }));
   } catch (error) {
     console.error('Error fetching tags:', error);
   } finally {
@@ -80,9 +116,11 @@ watch(loading, (isLoading) => {
             v-for="tag in tags"
             :key="tag.id"
             @click="openTag(tag)"
-            class="px-4 py-2 rounded-full bg-white bg-opacity-80 backdrop-blur border border-gray-200 text-sm text-gray-700 hover:text-gray-900 hover:bg-opacity-100 transition-colors"
+            class="px-4 py-2 rounded-full backdrop-blur border border-gray-200 text-sm text-slate-800 hover:text-slate-900 transition-colors flex items-center gap-2"
+            :style="getTagStyle(tag)"
+            :title="`${tag.photoCount || 0} photos`"
           >
-            #{{ tag.name }}
+            <span>#{{ tag.name }}</span>
           </button>
         </div>
       </CommonContainer>
