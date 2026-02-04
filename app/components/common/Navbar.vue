@@ -82,7 +82,7 @@
               </a>
             </div>
 
-            <div v-if="pb.authStore.isValid" class="block md:hidden bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2">
+            <div class="block md:hidden bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2">
             <button @click="open = !open" class="text-gray-800 pr-1 pl-0.5">
               <svg
                 fill="currentColor"
@@ -151,28 +151,35 @@
 
   const open = ref(false);
 
-  const menuitems = [
-  {
-    title: "Home",
-    path: "/",
-    icon: "heroicons:home",
-  },
-  {
-    title: "Albums",
-    path: "/albums",
-    icon: "heroicons:rectangle-stack",
-  },
-  {
-    title: "Tags",
-    path: "/tags",
-    icon: "heroicons:tag",
-  },
-  {
-    title: "Profile",
-    path: "/profile",
-    icon: "heroicons:user-circle",
-  }
-];
+  const menuitems = computed(() => {
+    const items = [
+      {
+        title: "Home",
+        path: "/",
+        icon: "heroicons:home",
+      },
+      {
+        title: "Albums",
+        path: "/albums",
+        icon: "heroicons:rectangle-stack",
+      },
+      {
+        title: "Tags",
+        path: "/tags",
+        icon: "heroicons:tag",
+      }
+    ];
+
+    if (pb.authStore.isValid) {
+      items.push({
+        title: "Profile",
+        path: "/profile",
+        icon: "heroicons:user-circle",
+      });
+    }
+
+    return items;
+  });
 
   // Use shared gallery state composable (only on gallery page)
   const isGalleryPage = computed(() => route.path === '/' || route.path === '/albums' || route.path.startsWith('/albums/'));
