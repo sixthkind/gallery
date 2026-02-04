@@ -339,6 +339,15 @@ const getItemDateValue = (item) => {
   return getPhotoDateValue(item);
 };
 
+const getNextGroupSortOrder = () => {
+  const step = 1000;
+  const groupOrders = groups.value
+    .map(group => group.sortOrder)
+    .filter(order => typeof order === 'number');
+  const maxOrder = groupOrders.length > 0 ? Math.max(...groupOrders) : 0;
+  return maxOrder + step;
+};
+
 const comparePhotoDate = (a, b) => {
   const diff = getPhotoDateValue(b) - getPhotoDateValue(a);
   return props.dateSortDirection === 'asc' ? -diff : diff;
@@ -1218,9 +1227,11 @@ const createQuickGroup = async () => {
     const photoIds = selectedPhotosData.value.map(photo => photo.id);
     const coverPhotoId = photoIds[0];
     
-    // Get the sortOrder from the first selected photo
+    // Choose a sortOrder for the new group
     const firstPhoto = selectedPhotosData.value[0];
-    const groupSortOrder = typeof firstPhoto.sortOrder === 'number' ? firstPhoto.sortOrder : 0;
+    const groupSortOrder = props.albumId
+      ? getNextGroupSortOrder()
+      : (typeof firstPhoto.sortOrder === 'number' ? firstPhoto.sortOrder : 0);
     
     const groupData = {
       title: '',
@@ -1244,7 +1255,6 @@ const createQuickGroup = async () => {
       await pb.collection('photos').update(photoId, updateData);
     }
 
-    emit('update:selectionMode', false);
     clearSelectionState();
     refresh();
   } catch (error) {
