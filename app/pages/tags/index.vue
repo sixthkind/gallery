@@ -23,13 +23,16 @@ const getTagStyle = (tag) => {
   const max = maxTagCount.value;
   const ratio = max > 1 ? Math.max(0, Math.min(1, (count - 1) / (max - 1))) : 0;
   const glow = { r: 196, g: 181, b: 253 }; // Tailwind purple-400
-  const borderAlpha = 0.2 + ratio * 0.7;
-  const glowAlpha = 0.1 + ratio * 0.5;
-  const glowSize = 4 + ratio * 12;
+  const borderAlpha = 0.25 + ratio * 0.65;
+  const glowAlpha = 0.2 + ratio * 0.6;
+  const glowSize = 2 + ratio * 6;
+  const ringSize = 1 + ratio * 1.5;
   return {
     backgroundColor: '#ffffff',
     borderColor: ratio > 0 ? `rgba(${glow.r}, ${glow.g}, ${glow.b}, ${borderAlpha})` : 'rgb(226, 232, 240)',
-    boxShadow: ratio > 0 ? `0 0 ${glowSize}px rgba(${glow.r}, ${glow.g}, ${glow.b}, ${glowAlpha})` : 'none'
+    boxShadow: ratio > 0
+      ? `0 0 0 ${ringSize}px rgba(${glow.r}, ${glow.g}, ${glow.b}, ${borderAlpha}), 0 0 ${glowSize}px rgba(${glow.r}, ${glow.g}, ${glow.b}, ${glowAlpha})`
+      : 'none'
   };
 };
 
