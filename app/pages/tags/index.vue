@@ -1,6 +1,8 @@
 <script setup>
 import { pb } from '#imports';
 import { ref, onMounted, watch, computed } from 'vue';
+
+const colorMode = useColorMode();
 import { useRoute, useRouter } from 'vue-router';
 
 definePageMeta({});
@@ -27,9 +29,13 @@ const getTagStyle = (tag) => {
   const glowAlpha = 0.2 + ratio * 0.6;
   const glowSize = 2 + ratio * 6;
   const ringSize = 1 + ratio * 1.5;
+  const isDark = colorMode.value === 'dark';
+
   return {
-    backgroundColor: '#ffffff',
-    borderColor: ratio > 0 ? `rgba(${glow.r}, ${glow.g}, ${glow.b}, ${borderAlpha})` : 'rgb(226, 232, 240)',
+    backgroundColor: isDark ? 'rgba(30, 41, 59, 0.55)' : '#ffffff',
+    borderColor: ratio > 0
+      ? `rgba(${glow.r}, ${glow.g}, ${glow.b}, ${borderAlpha})`
+      : (isDark ? 'rgba(148, 163, 184, 0.25)' : 'rgb(226, 232, 240)'),
     boxShadow: ratio > 0
       ? `0 0 0 ${ringSize}px rgba(${glow.r}, ${glow.g}, ${glow.b}, ${borderAlpha}), 0 0 ${glowSize}px rgba(${glow.r}, ${glow.g}, ${glow.b}, ${glowAlpha})`
       : 'none'
@@ -138,6 +144,11 @@ watch(loading, (isLoading) => {
   background: linear-gradient(90deg, #f2f2f2 0%, #e6e6e6 50%, #f2f2f2 100%);
   background-size: 200% 100%;
   animation: tag-skeleton-shimmer 1.3s ease-in-out infinite;
+}
+
+:global(html.dark) .tag-skeleton-pill {
+  background: linear-gradient(90deg, rgba(30, 41, 59, 0.65) 0%, rgba(51, 65, 85, 0.65) 50%, rgba(30, 41, 59, 0.65) 100%);
+  background-size: 200% 100%;
 }
 
 @keyframes tag-skeleton-shimmer {
