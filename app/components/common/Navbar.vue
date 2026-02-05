@@ -17,7 +17,7 @@
             <!-- Theme toggle -->
             <button
               @click="toggleDarkMode"
-              class="bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
+              class="bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 inline-flex items-center justify-center leading-none hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
               :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
             >
               <Icon
