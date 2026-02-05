@@ -51,6 +51,16 @@
         <Icon name="heroicons:arrow-path" class="text-lg" />
         <span>{{ replacing ? 'Replacing...' : 'Replace' }}</span>
       </button>
+
+      <!-- Set Location Button -->
+      <button
+        v-if="isAuthenticated && selectedPhotos.length > 0"
+        @click="promptSetLocation"
+        class="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors duration-200 flex items-center gap-2"
+      >
+        <Icon name="heroicons:map-pin" class="text-lg" />
+        <span>Location</span>
+      </button>
       
       <!-- Delete Selected Photos Button (works in both select mode and edit mode) -->
       <button
@@ -321,6 +331,7 @@ const expandedGroupsBeforeSelection = ref(new Set()); // Track expanded groups w
 const gridLayout = ref(null); // Ref to the grid layout component
 const replaceInput = ref(null);
 const replacing = ref(false);
+const isAuthenticated = computed(() => pb.authStore.isValid);
 const groupCount = computed(() => groups.value.length);
 const areAllGroupsExpanded = computed(() => {
   return groupCount.value > 0 && expandedGroups.value.size === groupCount.value;
@@ -1469,6 +1480,69 @@ const confirmDeleteSelected = async () => {
     ]
   });
   await alert.present();
+};
+
+const promptSetLocation = async () => {
+  if (!isAuthenticated.value || selectedPhotos.value.length === 0) return;
+
+  const photoCount = selectedPhotos.value.length;
+  const alert = await alertController.create({
+    header: 'Set Location',
+    message: `Set a location for ${photoCount} photo${photoCount !== 1 ? 's' : ''}.`,
+    inputs: [
+      {
+        name: 'location',
+        type: 'text',
+        placeholder: 'Add location'
+      }
+    ],
+    buttons: [
+      {
+        text: 'Cancel',
+        role: 'cancel'
+      },
+      {
+        text: 'Save',
+        handler: (data) => {
+          const location = data?.location?.trim() || '';
+          updateSelectedLocations(location);
+        }
+      }
+    ]
+  });
+
+  await alert.present();
+};
+
+const updateSelectedLocations = async (location) => {
+  if (!isAuthenticated.value || selectedPhotos.value.length === 0) return;
+
+  const photoIds = [...new Set(selectedPhotos.value)];
+  try {
+    await Promise.all(photoIds.map(photoId => {
+      return pb.collection('photos').update(photoId, { location });
+    }));
+
+    photos.value = photos.value.map(photo =>
+      photoIds.includes(photo.id) ? { ...photo, location } : photo
+    );
+
+    groups.value = groups.value.map(group => {
+      if (!group.expand?.photos) return group;
+      const updatedPhotos = group.expand.photos.map(photo =>
+        photoIds.includes(photo.id) ? { ...photo, location } : photo
+      );
+      return {
+        ...group,
+        expand: {
+          ...group.expand,
+          photos: updatedPhotos
+        }
+      };
+    });
+  } catch (error) {
+    console.error('Error updating photo locations:', error);
+  }
 };
 
 // Delete multiple selected photos

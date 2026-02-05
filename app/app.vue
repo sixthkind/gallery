@@ -1,5 +1,5 @@
 <template>
-  <ion-app>
+  <ion-app mode="ios">
     <CommonNavbar />
     <ion-router-outlet />
   </ion-app>
