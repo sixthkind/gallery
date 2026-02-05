@@ -18,6 +18,81 @@ const form = ref({
 const error = ref(null);
 
 const isAuthenticated = computed(() => pb.authStore.isValid);
+const { selectionMode } = useGalleryState();
+
+const getAlbumDateValue = (album) => {
+  const value = album?.created || 0;
+  return new Date(value).getTime();
+};
+
+const ensureAlbumSortOrder = async (items) => {
+  if (!pb.authStore.isValid) return;
+  const missing = items.filter(item => typeof item.sortOrder !== 'number');
+  if (missing.length === 0) return;
+
+  const withOrder = items.filter(item => typeof item.sortOrder === 'number');
+  const step = 1000;
+  const missingSorted = [...missing].sort((a, b) => getAlbumDateValue(b) - getAlbumDateValue(a));
+
+  let updates = [];
+  if (withOrder.length === 0) {
+    updates = missingSorted.map((item, index) => ({
+      item,
+      sortOrder: index * step
+    }));
+  } else {
+    const minOrder = Math.min(...withOrder.map(item => item.sortOrder));
+    const missingCount = missingSorted.length;
+    updates = missingSorted.map((item, index) => ({
+      item,
+      sortOrder: minOrder - step * (missingCount - index)
+    }));
+  }
+
+  await Promise.all(updates.map(async ({ item, sortOrder }) => {
+    try {
+      await pb.collection('albums').update(item.id, { sortOrder });
+      item.sortOrder = sortOrder;
+    } catch (error) {
+      console.error('Error updating album sort order:', error);
+    }
+  }));
+};
+
+const normalizeAlbumSortOrder = async (items) => {
+  if (!pb.authStore.isValid) return;
+  if (!items || items.length === 0) return;
+  const numericOrders = items
+    .map(item => item.sortOrder)
+    .filter(order => typeof order === 'number');
+  const uniqueOrders = new Set(numericOrders);
+  if (numericOrders.length === items.length && uniqueOrders.size === items.length) return;
+
+  const step = 1000;
+  const sortedItems = [...items].sort((a, b) => getAlbumDateValue(b) - getAlbumDateValue(a));
+  await Promise.all(sortedItems.map(async (item, index) => {
+    const sortOrder = index * step;
+    try {
+      await pb.collection('albums').update(item.id, { sortOrder });
+      item.sortOrder = sortOrder;
+    } catch (error) {
+      console.error('Error normalizing album sort order:', error);
+    }
+  }));
+};
+
+const orderedAlbums = computed(() => {
+  const items = [...albums.value];
+  items.sort((a, b) => {
+    const aOrder = typeof a.sortOrder === 'number' ? a.sortOrder : null;
+    const bOrder = typeof b.sortOrder === 'number' ? b.sortOrder : null;
+    if (aOrder !== null && bOrder !== null) return aOrder - bOrder;
+    if (aOrder !== null) return -1;
+    if (bOrder !== null) return 1;
+    return getAlbumDateValue(b) - getAlbumDateValue(a);
+  });
+  return items;
+});
 
 const fetchAlbums = async () => {
   loading.value = true;
@@ -26,10 +101,12 @@ const fetchAlbums = async () => {
       sort: '-created',
       expand: 'coverPhoto'
     });
+    await ensureAlbumSortOrder(albums.value);
+    await normalizeAlbumSortOrder(albums.value);
     const albumIds = albums.value.map(album => album.id);
     if (albumIds.length > 0) {
       const photos = await pb.collection('photos').getFullList({
-        sort: '-created',
+        sort: '-dateTaken,-created',
         filter: `album != ""`
       });
       const byAlbum = new Map();
@@ -46,7 +123,9 @@ const fetchAlbums = async () => {
           if (aOrder !== null && bOrder !== null) return aOrder - bOrder;
           if (aOrder !== null) return -1;
           if (bOrder !== null) return 1;
-          return new Date(b.created) - new Date(a.created);
+          const aDate = a.dateTaken || a.created || 0;
+          const bDate = b.dateTaken || b.created || 0;
+          return new Date(bDate) - new Date(aDate);
         });
         const seenGroups = new Set();
         const unique = [];
@@ -80,11 +159,85 @@ const getAlbumTilePhotos = (albumId) => {
 };
 
 const getPhotoUrl = (photo) => {
-  return pb.files.getURL(photo, photo.photo, { thumb: '300x300' });
+  return pb.files.getURL(photo, photo.photo, { thumb: '250x250' });
 };
 
 const openAlbum = (album) => {
   router.push(`/albums/${album.id}`);
+};
+
+const setAlbumSortOrder = (albumId, sortOrder) => {
+  const index = albums.value.findIndex(album => album.id === albumId);
+  if (index === -1) return;
+  albums.value[index] = { ...albums.value[index], sortOrder };
+};
+
+const reorderAlbums = async ({ sourceId, targetId }) => {
+  if (!selectionMode.value) return;
+  if (!sourceId || !targetId || sourceId === targetId) return;
+
+  const ids = orderedAlbums.value.map(item => item.id);
+  const fromIndex = ids.indexOf(sourceId);
+  const toIndex = ids.indexOf(targetId);
+  if (fromIndex === -1 || toIndex === -1) return;
+
+  ids.splice(fromIndex, 1);
+  ids.splice(toIndex, 0, sourceId);
+
+  const prevId = ids[toIndex - 1];
+  const nextId = ids[toIndex + 1];
+  const prevItem = prevId ? orderedAlbums.value.find(item => item.id === prevId) : null;
+  const nextItem = nextId ? orderedAlbums.value.find(item => item.id === nextId) : null;
+  const prevOrder = typeof prevItem?.sortOrder === 'number' ? prevItem.sortOrder : null;
+  const nextOrder = typeof nextItem?.sortOrder === 'number' ? nextItem.sortOrder : null;
+
+  // Check if sortOrders are too close or identical (need renormalization)
+  const needsRenormalization = 
+    (prevOrder !== null && nextOrder !== null && Math.abs(nextOrder - prevOrder) < 0.1) ||
+    (prevOrder === null && nextOrder !== null && nextOrder === 0) ||
+    (prevOrder !== null && nextOrder === null && prevOrder === 0);
+
+  if (needsRenormalization) {
+    // Renormalize all albums with proper spacing
+    const step = 1000;
+    const renormalizeUpdates = [];
+    
+    for (let i = 0; i < ids.length; i++) {
+      const albumId = ids[i];
+      const newSortOrder = i * step;
+      renormalizeUpdates.push({ albumId, sortOrder: newSortOrder });
+    }
+    
+    // Apply renormalization to database and local state
+    await Promise.all(renormalizeUpdates.map(async ({ albumId, sortOrder }) => {
+      try {
+        await pb.collection('albums').update(albumId, { sortOrder });
+        setAlbumSortOrder(albumId, sortOrder);
+      } catch (error) {
+        console.error('Error renormalizing album sort order:', error);
+      }
+    }));
+    
+    return; // Renormalization done, the UI will update
+  }
+
+  let newOrder = 0;
+  if (prevOrder === null && nextOrder === null) {
+    newOrder = 0;
+  } else if (prevOrder === null) {
+    newOrder = nextOrder - 1000;
+  } else if (nextOrder === null) {
+    newOrder = prevOrder + 1000;
+  } else {
+    newOrder = prevOrder + (nextOrder - prevOrder) / 2;
+  }
+
+  setAlbumSortOrder(sourceId, newOrder);
+  try {
+    await pb.collection('albums').update(sourceId, { sortOrder: newOrder });
+  } catch (error) {
+    console.error('Error updating album sort order:', error);
+  }
 };
 
 const toggleCreate = () => {
@@ -186,14 +339,15 @@ watch(() => route.fullPath, () => {
         </div>
         <GalleryPhotoGridLayout
           v-else
-          :items="albums"
+          :items="orderedAlbums"
           layout="grid"
-          :selection-mode="false"
+          :selection-mode="selectionMode"
           :selected-photos="[]"
           @photo-click="openAlbum"
+          @reorder="reorderAlbums"
         >
           <template #photo-item="{ item }">
-            <div class="relative overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 bg-gray-50" style="aspect-ratio: 1 / 1;">
+            <div class="relative overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 bg-gray-50 dark:bg-slate-900/40" style="aspect-ratio: 1 / 1;">
               <div class="grid grid-cols-2 grid-rows-2 w-full h-full">
                 <div
                   v-for="(photo, index) in getAlbumTilePhotos(item.id)"

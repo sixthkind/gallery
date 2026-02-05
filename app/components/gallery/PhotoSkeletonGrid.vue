@@ -152,6 +152,11 @@ onBeforeUnmount(() => {
   animation: skeleton-shimmer 1.3s ease-in-out infinite;
 }
 
+:global(html.dark) .skeleton-tile {
+  background: linear-gradient(90deg, rgba(30, 41, 59, 0.65) 0%, rgba(51, 65, 85, 0.65) 50%, rgba(30, 41, 59, 0.65) 100%);
+  background-size: 200% 100%;
+}
+
 .skeleton-tile--square {
   aspect-ratio: 1 / 1;
 }

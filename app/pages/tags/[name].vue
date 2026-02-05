@@ -1,5 +1,6 @@
 <script setup>
 import { pb } from '#imports';
+import { alertController } from '@ionic/vue';
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -17,6 +18,7 @@ const isEditingTag = ref(false);
 const pendingTagName = ref('');
 const saveTimer = ref(null);
 const isAuthenticated = computed(() => pb.authStore.isValid);
+const isDeletingTag = ref(false);
 
 const fetchTag = async () => {
   if (!tagName.value) {
@@ -31,7 +33,7 @@ const fetchTag = async () => {
     const tagId = tagRecord.value.id;
     pendingTagName.value = tagRecord.value?.name || '';
     const allTagged = await pb.collection('photos').getFullList({
-      sort: '-created',
+      sort: '-dateTaken,-created',
       expand: 'tags'
     });
     photos.value = allTagged.filter(photo => {
@@ -131,6 +133,37 @@ const goBack = () => {
   router.push('/tags');
 };
 
+const deleteTag = async () => {
+  if (!isAuthenticated.value || !tagRecord.value || isDeletingTag.value) return;
+  const tagLabel = tagRecord.value?.name || String(tagName.value || '').trim() || 'this tag';
+  const alert = await alertController.create({
+    header: 'Delete Tag',
+    message: `Delete "${tagLabel}"? This cannot be undone.`,
+    buttons: [
+      {
+        text: 'Cancel',
+        role: 'cancel'
+      },
+      {
+        text: 'Delete',
+        role: 'destructive',
+        handler: async () => {
+          isDeletingTag.value = true;
+          try {
+            await pb.collection('tags').delete(tagRecord.value.id);
+            router.push({ path: '/tags', query: { refreshed: Date.now().toString() } });
+          } catch (error) {
+            console.error('Error deleting tag:', error);
+          } finally {
+            isDeletingTag.value = false;
+          }
+        }
+      }
+    ]
+  });
+  await alert.present();
+};
+
 const navigateLightbox = (direction) => {
   const list = allPhotosForLightbox.value;
   const index = list.findIndex(p => p.id === selectedPhoto.value?.id);
@@ -213,15 +246,30 @@ watch(pendingTagName, () => {
               aria-label="Tag name"
             />
           </div>
-          <button
-            v-if="nextTag"
-            class="flex items-center gap-2 text-gray-300 hover:text-gray-700 transition-colors"
-            @click="router.push(`/tags/${encodeURIComponent(nextTag.name)}`)"
-            aria-label="Next tag"
-          >
-            <span class="text-lg font-semibold">#{{ nextTag.name }}</span>
-            <Icon name="heroicons:arrow-right" class="text-2xl" />
-          </button>
+          <div class="flex items-center gap-3">
+            <button
+              v-if="isAuthenticated"
+              @click="deleteTag"
+              :disabled="isDeletingTag"
+              class="bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              <Icon
+                v-if="isDeletingTag"
+                name="svg-spinners:ring-resize"
+                class="text-base"
+              />
+              <span>Delete Tag</span>
+            </button>
+            <button
+              v-if="nextTag"
+              class="flex items-center gap-2 text-gray-300 hover:text-gray-700 transition-colors"
+              @click="router.push(`/tags/${encodeURIComponent(nextTag.name)}`)"
+              aria-label="Next tag"
+            >
+              <span class="text-lg font-semibold">#{{ nextTag.name }}</span>
+              <Icon name="heroicons:arrow-right" class="text-2xl" />
+            </button>
+          </div>
         </div>
 
         <div v-if="loading">
@@ -230,25 +278,26 @@ watch(pendingTagName, () => {
         <div v-else-if="photos.length === 0" class="text-center py-20 text-gray-500">
           No photos with this tag.
         </div>
-        <GalleryPhotoGridLayout
-          v-else
-          :items="photos"
-          layout="grid"
-          :selection-mode="false"
-          :selected-photos="[]"
-          @photo-click="openLightbox"
-        >
-          <template #photo-item="{ item, getPhotoUrl }">
-            <div class="relative overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 aspect-square">
-              <img
-                :src="getPhotoUrl(item, '500x500')"
-                :alt="item.title || 'Photo'"
-                class="w-full h-full object-cover"
-                loading="lazy"
-              />
-            </div>
-          </template>
-        </GalleryPhotoGridLayout>
+        <div v-else class="tag-gallery-shell">
+          <GalleryPhotoGridLayout
+            :items="photos"
+            layout="grid"
+            :selection-mode="false"
+            :selected-photos="[]"
+            @photo-click="openLightbox"
+          >
+            <template #photo-item="{ item, getPhotoUrl }">
+              <div class="relative overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 aspect-square">
+                <img
+                  :src="getPhotoUrl(item, '500x500')"
+                  :alt="item.title || 'Photo'"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+            </template>
+          </GalleryPhotoGridLayout>
+        </div>
       </CommonContainer>
 
       <GalleryPhotoLightbox
@@ -262,3 +311,10 @@ watch(pendingTagName, () => {
     </ion-content>
   </ion-page>
 </template>
+
+<style scoped>
+.tag-gallery-shell {
+  position: relative;
+  padding: 2rem 0;
+}
+</style>

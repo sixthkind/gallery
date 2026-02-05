@@ -5,42 +5,40 @@
         <div class="flex w-full items-center justify-between">
 
           <div class="flex items-center gap-3">
-            <div class="bg-white bg-opacity-90 hover:bg-opacity-70 flex backdrop-blur mt-3 rounded-lg border p-2">
+            <div class="bg-white bg-opacity-90 hover:bg-opacity-70 flex backdrop-blur mt-3 rounded-lg border p-2 dark:bg-slate-900/70 dark:hover:bg-slate-900/80 dark:border-slate-700/60">
               <a href="/">
-                <span class="font-bold text-primary">_</span><span class="font-bold text-slate-500">{{ sitename }}</span><span class="font-bold text-slate-500 opacity-80">{{ sitename2 }}</span>
+                <span class="font-bold text-primary">_</span><span class="font-bold text-slate-500 dark:text-slate-200">{{ sitename }}</span><span class="font-bold text-slate-500 opacity-80 dark:text-slate-300">{{ sitename2 }}</span>
               </a>
             </div>
 
           </div>
 
           <div class="flex items-center gap-3">
-            <a
-              href="/albums"
-              class="bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 hover:bg-opacity-90 transition-colors"
-              title="Albums"
+            <!-- Theme toggle -->
+            <button
+              @click="toggleDarkMode"
+              class="bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border h-10 w-10 inline-flex items-center justify-center leading-none hover:bg-opacity-90 transition-colors ring-1 ring-slate-300/40 dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60 dark:ring-slate-600/35"
+              :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
             >
-              <Icon name="heroicons:rectangle-stack" class="w-5 h-5 text-gray-700" />
-            </a>
-            <a
-              href="/tags"
-              class="bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 hover:bg-opacity-90 transition-colors"
-              title="Tags"
-            >
-              <Icon name="heroicons:tag" class="w-5 h-5 text-gray-700" />
-            </a>
+              <Icon
+                :name="isDark ? 'heroicons:sun' : 'heroicons:moon'"
+                class="w-5 h-5 text-gray-700 dark:text-slate-200"
+              />
+            </button>
+
             <!-- Gallery Action Icons (only show on gallery page) -->
             <div v-if="pb.authStore.isValid && isGalleryPage && galleryState" class="flex items-center gap-2">
               <!-- Upload Icon -->
               <button
                 @click="galleryState.toggleUpload()"
-                class="bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 hover:bg-opacity-90 transition-colors"
+                class="bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
                 :title="galleryState.showUpload.value ? 'Hide upload' : 'Show upload'"
               >
                 <Icon 
                   name="heroicons:cloud-arrow-up" 
                   :class="[
                     'w-5 h-5 transition-colors',
-                    galleryState.showUpload.value ? 'text-primary' : 'text-gray-400'
+                    galleryState.showUpload.value ? 'text-primary' : 'text-gray-400 dark:text-slate-400'
                   ]"
                 />
               </button>
@@ -48,14 +46,14 @@
               <!-- Selection Mode Toggle Icon -->
               <button
                 @click="galleryState.toggleSelection()"
-                class="bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 hover:bg-opacity-90 transition-colors"
+                class="bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
                 :title="galleryState.selectionMode.value ? 'Exit selection mode' : 'Enter selection mode'"
               >
                 <Icon 
                   name="heroicons:cursor-arrow-rays" 
                   :class="[
                     'w-5 h-5 transition-colors',
-                    galleryState.selectionMode.value ? 'text-primary' : 'text-gray-400'
+                    galleryState.selectionMode.value ? 'text-primary' : 'text-gray-400 dark:text-slate-400'
                   ]"
                 />
               </button>
@@ -72,16 +70,32 @@
                 />
               </button> -->
             </div>
+            <a
+              href="/albums"
+              class="hidden md:inline-flex items-center gap-2 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border px-3 py-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
+              title="Albums"
+            >
+              <Icon name="heroicons:rectangle-stack" class="w-5 h-5 text-gray-700 dark:text-slate-200" />
+              <span class="font-bold text-slate-500 dark:text-slate-300">Albums</span>
+            </a>
+            <a
+              href="/tags"
+              class="hidden md:inline-flex items-center gap-2 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border px-3 py-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
+              title="Tags"
+            >
+              <Icon name="heroicons:tag" class="w-5 h-5 text-gray-700 dark:text-slate-200" />
+              <span class="font-bold text-slate-500 dark:text-slate-300">Tags</span>
+            </a>
 
-            <div v-if="pb.authStore.isValid" class="hidden md:flex bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 flex items-center">
+            <div v-if="pb.authStore.isValid" class="hidden md:flex bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 flex items-center dark:bg-slate-900/60 dark:border-slate-700/60">
               <a href="/profile">
                 <span class="font-bold text-primary">{{ emailUsername }}</span>
-                <span class="font-bold text-slate-500">@</span><span class="font-bold text-slate-400">{{ emailDomain }}</span>
+                <span class="font-bold text-slate-500 dark:text-slate-300">@</span><span class="font-bold text-slate-400 dark:text-slate-400">{{ emailDomain }}</span>
               </a>
             </div>
 
-            <div v-if="pb.authStore.isValid" class="block md:hidden bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2">
-            <button @click="open = !open" class="text-gray-800 pr-1 pl-0.5">
+            <div class="block md:hidden bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 dark:bg-slate-900/60 dark:border-slate-700/60">
+            <button @click="open = !open" class="text-gray-800 dark:text-slate-100 pr-1 pl-0.5">
               <svg
                 fill="currentColor"
                 class="w-4 h-4"
@@ -109,15 +123,16 @@
 
         <nav
             v-if="open"
-            class="w-full lg:w-auto mt-3 md:hidden lg:mt-3 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border"
+            class="w-full lg:w-auto mt-3 md:hidden lg:mt-3 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border dark:bg-slate-900/60 dark:border-slate-700/60"
             :class="{ block: open, hidden: !open }"
           >
           <ul class="flex flex-col lg:flex-row lg:gap-3">
               <li v-for="item of menuitems" :key="item.link" class="text-center">
                 <a
                   :href="item.path"
-                  class="flex justify-center items-center lg:px-3 py-2 text-gray-600 hover:text-gray-900"
+                  class="flex justify-center items-center gap-2 lg:px-3 py-2 text-gray-600 hover:text-gray-900 dark:text-slate-300 dark:hover:text-slate-100"
                   >
+                  <Icon v-if="item.icon" :name="item.icon" class="w-4 h-4 text-gray-500 dark:text-slate-400" />
                   {{ item.title }}
                 </a>
               </li>
@@ -133,6 +148,11 @@
   import { useRoute } from 'vue-router';
   
   const route = useRoute();
+  const colorMode = useColorMode();
+  const isDark = computed(() => colorMode.value === 'dark');
+  const toggleDarkMode = () => {
+    colorMode.preference = isDark.value ? 'light' : 'dark';
+  };
   const config = useRuntimeConfig();
   const sitename = ref(String(config.public.sitename));
   const sitename2 = ref(String(config.public.sitename2));
@@ -148,19 +168,38 @@
 
   const open = ref(false);
 
-  const menuitems = [
-  {
-    title: "Dashboard",
-    path: "/",
-  },
-  {
-    title: "Profile",
-    path: "/profile",
-  }
-];
+  const menuitems = computed(() => {
+    const items = [
+      {
+        title: "Home",
+        path: "/",
+        icon: "heroicons:home",
+      },
+      {
+        title: "Albums",
+        path: "/albums",
+        icon: "heroicons:rectangle-stack",
+      },
+      {
+        title: "Tags",
+        path: "/tags",
+        icon: "heroicons:tag",
+      }
+    ];
+
+    if (pb.authStore.isValid) {
+      items.push({
+        title: "Profile",
+        path: "/profile",
+        icon: "heroicons:user-circle",
+      });
+    }
+
+    return items;
+  });
 
   // Use shared gallery state composable (only on gallery page)
-  const isGalleryPage = computed(() => route.path === '/' || route.path.startsWith('/albums/'));
+  const isGalleryPage = computed(() => route.path === '/' || route.path === '/albums' || route.path.startsWith('/albums/'));
   const galleryState = useGalleryState();
 
   // Get layout icon based on current layout

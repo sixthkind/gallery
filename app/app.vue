@@ -1,24 +1,31 @@
 <template>
-  <ion-app>
+  <ion-app mode="ios">
     <CommonNavbar />
     <ion-router-outlet />
   </ion-app>
 </template>
 
-<script setup>
-  onMounted(() => {
-    // Set nuxt color mode to light
-    localStorage.setItem('nuxt-color-mode', 'light');
+<script setup lang="ts">
+const colorMode = useColorMode();
 
-    // Disables ionic dark theme (prefer-color-scheme)
-    document.documentElement.style.colorScheme = 'light';
-  });
+// Keep native UI (form controls, scrollbars) in sync.
+watchEffect(() => {
+  const scheme = colorMode.value === 'dark' ? 'dark' : 'light';
+
+  // Nuxt color-mode *should* manage the class, but in some Ionic contexts
+  // we force it to guarantee Tailwind `dark:` + CSS vars apply immediately.
+  document.documentElement.classList.toggle('dark', scheme === 'dark');
+  document.body.classList.toggle('dark', scheme === 'dark');
+
+  // Native UI (form controls, scrollbars).
+  document.documentElement.style.colorScheme = scheme;
+});
 </script>
 
 <style>
-  body {
-    height: 100%;
-    background: #F7F6F2;
-    background-attachment: fixed;
-  }
+body {
+  height: 100%;
+  background: var(--app-bg);
+  background-attachment: fixed;
+}
 </style>

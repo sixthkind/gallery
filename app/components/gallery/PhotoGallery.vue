@@ -32,15 +32,39 @@
       <button
         v-if="isEditMode && !hasPhotosOutsideGroup && selectedPhotos.length > 0"
         @click="removePhotosFromGroup"
-        class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors duration-200 flex items-center gap-2"
+        class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center gap-2"
       >
-        <Icon name="heroicons:trash" class="text-lg" />
-        <span>Remove from Group</span>
+        <Icon name="heroicons:arrow-uturn-left" class="text-lg" />
+        <span>Remove</span>
+      </button>
+
+      <!-- Replace Selected Photo Button (only when single photo is selected) -->
+      <button
+        v-if="selectedPhotos.length === 1"
+        @click="triggerReplace"
+        :disabled="replacing"
+        :class="[
+          'px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center gap-2',
+          replacing ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600 text-white'
+        ]"
+      >
+        <Icon name="heroicons:arrow-path" class="text-lg" />
+        <span>{{ replacing ? 'Replacing...' : 'Replace' }}</span>
+      </button>
+
+      <!-- Set Location Button -->
+      <button
+        v-if="isAuthenticated && selectedPhotos.length > 0"
+        @click="promptSetLocation"
+        class="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors duration-200 flex items-center gap-2"
+      >
+        <Icon name="heroicons:map-pin" class="text-lg" />
+        <span>Location</span>
       </button>
       
-      <!-- Delete Selected Photos Button (only in select mode, not edit mode) -->
+      <!-- Delete Selected Photos Button (works in both select mode and edit mode) -->
       <button
-        v-if="!isEditMode && selectedPhotos.length > 0"
+        v-if="selectedPhotos.length > 0"
         @click="confirmDeleteSelected"
         class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors duration-200 flex items-center gap-2"
       >
@@ -65,6 +89,13 @@
         >
           Clear
         </button>
+        <input
+          ref="replaceInput"
+          type="file"
+          accept="image/*"
+          class="hidden"
+          @change="handleReplaceSelect"
+        />
       </div>
     </div>
 
@@ -93,9 +124,10 @@
         :selection-mode="props.selectionMode"
         :selected-photos="selectedPhotos"
         :expanding-group-id="expandingGroupId"
-      :expanded-group-ids="expandedGroups"
-      :is-edit-mode="isEditMode"
-      :current-expanded-group-id="currentExpandedGroupId"
+        :expanded-group-ids="expandedGroups"
+        :are-all-groups-expanded="areAllGroupsExpanded"
+        :is-edit-mode="isEditMode"
+        :current-expanded-group-id="currentExpandedGroupId"
       @photo-click="handleItemClick"
       @toggle-selection="togglePhotoSelection"
       @reorder="reorderItems"
@@ -257,11 +289,17 @@
 import { pb } from '#imports';
 import { alertController } from '@ionic/vue';
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import exifr from 'exifr';
 
 const props = defineProps({
   selectionMode: {
     type: Boolean,
     default: false
+  },
+  dateSortDirection: {
+    type: String,
+    default: 'desc',
+    validator: (value) => ['asc', 'desc'].includes(value)
   },
   currentLayout: {
     type: String,
@@ -289,7 +327,47 @@ const loading = ref(true);
 const selectedPhoto = ref(null);
 const expandedGroups = ref(new Set()); // Track which groups are expanded
 const expandingGroupId = ref(null); // Track which group is currently expanding
+const expandedGroupsBeforeSelection = ref(new Set()); // Track expanded groups when entering selection mode
 const gridLayout = ref(null); // Ref to the grid layout component
+const replaceInput = ref(null);
+const replacing = ref(false);
+const isAuthenticated = computed(() => pb.authStore.isValid);
+const groupCount = computed(() => groups.value.length);
+const areAllGroupsExpanded = computed(() => {
+  return groupCount.value > 0 && expandedGroups.value.size === groupCount.value;
+});
+
+const getPhotoDateValue = (photo) => {
+  const value = photo?.dateTaken || photo?.created || 0;
+  return new Date(value).getTime();
+};
+
+const getItemDateValue = (item) => {
+  if (!item) return 0;
+  if (item.isGroup) {
+    return new Date(item.created || 0).getTime();
+  }
+  return getPhotoDateValue(item);
+};
+
+const getNextGroupSortOrder = () => {
+  const step = 1000;
+  const groupOrders = groups.value
+    .map(group => group.sortOrder)
+    .filter(order => typeof order === 'number');
+  const maxOrder = groupOrders.length > 0 ? Math.max(...groupOrders) : 0;
+  return maxOrder + step;
+};
+
+const comparePhotoDate = (a, b) => {
+  const diff = getPhotoDateValue(b) - getPhotoDateValue(a);
+  return props.dateSortDirection === 'asc' ? -diff : diff;
+};
+
+const compareItemDate = (a, b) => {
+  const diff = getItemDateValue(b) - getItemDateValue(a);
+  return props.dateSortDirection === 'asc' ? -diff : diff;
+};
 
 const setItemSortOrder = (itemId, isGroup, sortOrder) => {
   const targetList = isGroup ? groups.value : photos.value;
@@ -324,20 +402,30 @@ const ensureSortOrder = async (items) => {
 
   const withOrder = items.filter(item => typeof item.sortOrder === 'number');
   const step = 1000;
-  const missingSorted = [...missing].sort((a, b) => new Date(b.created) - new Date(a.created));
+
+  // Sort missing items by existing sortOrder first (to preserve any partial ordering), then by date
+  const missingSorted = [...missing].sort((a, b) => {
+    const aOrder = typeof a.sortOrder === 'number' ? a.sortOrder : null;
+    const bOrder = typeof b.sortOrder === 'number' ? b.sortOrder : null;
+    if (aOrder !== null && bOrder !== null) return aOrder - bOrder;
+    if (aOrder !== null) return -1;
+    if (bOrder !== null) return 1;
+    return compareItemDate(a, b);
+  });
 
   let updates = [];
   if (withOrder.length === 0) {
+    // No items have sortOrder yet - assign based on date order
     updates = missingSorted.map((item, index) => ({
       item,
       sortOrder: index * step
     }));
   } else {
-    const minOrder = Math.min(...withOrder.map(item => item.sortOrder));
-    const missingCount = missingSorted.length;
+    // Some items have sortOrder - place missing items at the end (after max) to preserve existing order
+    const maxOrder = Math.max(...withOrder.map(item => item.sortOrder));
     updates = missingSorted.map((item, index) => ({
       item,
-      sortOrder: minOrder - step * (missingCount - index)
+      sortOrder: maxOrder + step * (index + 1)
     }));
   }
 
@@ -348,29 +436,6 @@ const ensureSortOrder = async (items) => {
       setItemSortOrder(item.id, item.isGroup, sortOrder);
     } catch (error) {
       console.error('Error updating sort order:', error);
-    }
-  }));
-};
-
-const normalizeSortOrder = async (items) => {
-  if (!pb.authStore.isValid) return;
-  if (!items || items.length === 0) return;
-  const numericOrders = items
-    .map(item => item.sortOrder)
-    .filter(order => typeof order === 'number');
-  const uniqueOrders = new Set(numericOrders);
-  if (numericOrders.length === items.length && uniqueOrders.size === items.length) return;
-
-  const step = 1000;
-  const sortedItems = [...items].sort((a, b) => new Date(b.created) - new Date(a.created));
-  await Promise.all(sortedItems.map(async (item, index) => {
-    const sortOrder = index * step;
-    try {
-      const collectionName = item.isGroup ? 'groups' : 'photos';
-      await pb.collection(collectionName).update(item.id, { sortOrder });
-      setItemSortOrder(item.id, item.isGroup, sortOrder);
-    } catch (error) {
-      console.error('Error normalizing sort order:', error);
     }
   }));
 };
@@ -393,7 +458,7 @@ const ensureGroupPhotoSortOrder = async () => {
 
     if (missing.length === 0 && !needsNormalize) return;
 
-    const sortedPhotos = [...photosInGroup].sort((a, b) => new Date(a.created) - new Date(b.created));
+    const sortedPhotos = [...photosInGroup].sort(comparePhotoDate);
     sortedPhotos.forEach((photo, index) => {
       updates.push({
         groupId: group.id,
@@ -424,7 +489,7 @@ const fetchPhotos = async () => {
       : '(album = "" || album = null || favorite = true)';
     // Fetch all photos
     const allPhotos = await pb.collection('photos').getFullList({
-      sort: '-created',
+      sort: props.dateSortDirection === 'asc' ? 'dateTaken,created' : '-dateTaken,-created',
       expand: 'tags,group',
       filter: albumFilter
     });
@@ -438,15 +503,20 @@ const fetchPhotos = async () => {
     
     groups.value = allGroups;
     
-    // Filter out photos that are in groups, except favorited ones
-    photos.value = allPhotos.filter(photo => !photo.group || photo.favorite);
+    // Filter out photos that are in groups
+    // In the main gallery (no albumId), favorited photos from groups also appear as standalone
+    // In album pages, all grouped photos stay within their groups
+    photos.value = allPhotos.filter(photo => {
+      if (!photo.group) return true; // Not in a group - always include
+      if (props.albumId) return false; // In album page - grouped photos stay in groups only
+      return photo.favorite; // Main gallery - include favorited photos from groups
+    });
 
     const itemsForOrdering = [
       ...photos.value.map(photo => ({ ...photo, isGroup: false })),
       ...groups.value.map(group => ({ ...group, isGroup: true }))
     ];
     await ensureSortOrder(itemsForOrdering);
-    await normalizeSortOrder(itemsForOrdering);
     await ensureGroupPhotoSortOrder();
   } catch (error) {
     console.error('Error fetching photos:', error);
@@ -500,7 +570,7 @@ const baseItems = computed(() => {
       if (aOrder !== null && bOrder !== null) return aOrder - bOrder;
       if (aOrder !== null) return -1;
       if (bOrder !== null) return 1;
-      return new Date(a.created) - new Date(b.created);
+      return comparePhotoDate(a, b);
     });
     const coverPhoto = orderedGroupPhotos[0] ||
       group.expand?.coverPhoto ||
@@ -547,7 +617,7 @@ const orderedBaseItems = computed(() => {
     if (aOrder !== null && bOrder !== null) return aOrder - bOrder;
     if (aOrder !== null) return -1;
     if (bOrder !== null) return 1;
-    return new Date(b.created) - new Date(a.created);
+    return compareItemDate(a, b);
   });
   return items;
 });
@@ -558,6 +628,18 @@ const unifiedItems = computed(() => {
   const result = [];
   const seenPhotoIds = new Set();
   const seenGroupIds = new Set();
+
+  // First, collect all photo IDs that belong to expanded groups
+  // These should NOT appear as standalone photos
+  const photosInExpandedGroups = new Set();
+  orderedBaseItems.value.forEach(item => {
+    if (item.isGroup && item.isExpanded && item.group?.expand?.photos) {
+      item.group.expand.photos.forEach(photo => {
+        photosInExpandedGroups.add(photo.id);
+      });
+    }
+  });
+
   orderedBaseItems.value.forEach(item => {
     // If this is an expanded group, skip it but add its photos
     if (item.isGroup && item.isExpanded && item.group?.expand?.photos) {
@@ -567,7 +649,7 @@ const unifiedItems = computed(() => {
         if (aOrder !== null && bOrder !== null) return aOrder - bOrder;
         if (aOrder !== null) return -1;
         if (bOrder !== null) return 1;
-        return new Date(a.created) - new Date(b.created);
+        return comparePhotoDate(a, b);
       });
       groupPhotos.forEach(photo => {
         if (seenPhotoIds.has(photo.id)) return;
@@ -585,6 +667,9 @@ const unifiedItems = computed(() => {
         if (seenGroupIds.has(item.id)) return;
         seenGroupIds.add(item.id);
       } else {
+        // Skip standalone photos that belong to an expanded group
+        // They will be shown within the group context instead
+        if (photosInExpandedGroups.has(item.id)) return;
         if (seenPhotoIds.has(item.id)) return;
         seenPhotoIds.add(item.id);
       }
@@ -592,7 +677,7 @@ const unifiedItems = computed(() => {
       result.push(item);
     }
   });
-  
+
   return result;
 });
 
@@ -605,7 +690,7 @@ const getStackLayers = (item) => {
     if (aOrder !== null && bOrder !== null) return aOrder - bOrder;
     if (aOrder !== null) return -1;
     if (bOrder !== null) return 1;
-    return new Date(a.created) - new Date(b.created);
+    return comparePhotoDate(a, b);
   });
 
   // Return the first ordered photo, then up to 2 more photos
@@ -625,7 +710,7 @@ const allPhotosForLightbox = computed(() => {
         if (aOrder !== null && bOrder !== null) return aOrder - bOrder;
         if (aOrder !== null) return -1;
         if (bOrder !== null) return 1;
-        return new Date(a.created) - new Date(b.created);
+        return comparePhotoDate(a, b);
       });
       groupPhotos.forEach(photo => {
         if (!seen.has(photo.id)) {
@@ -884,7 +969,7 @@ const reorderItems = async ({ sourceId, targetId, groupId }) => {
       if (aOrder !== null && bOrder !== null) return aOrder - bOrder;
       if (aOrder !== null) return -1;
       if (bOrder !== null) return 1;
-      return new Date(a.created) - new Date(b.created);
+      return getPhotoDateValue(b) - getPhotoDateValue(a);
     });
     const ids = orderedGroupPhotos.map(photo => photo.id);
     const fromIndex = ids.indexOf(sourceId);
@@ -901,6 +986,36 @@ const reorderItems = async ({ sourceId, targetId, groupId }) => {
     const prevOrder = typeof prevItem?.sortOrder === 'number' ? prevItem.sortOrder : null;
     const nextOrder = typeof nextItem?.sortOrder === 'number' ? nextItem.sortOrder : null;
 
+    // Check if sortOrders are too close or identical (need renormalization)
+    const needsRenormalization = 
+      (prevOrder !== null && nextOrder !== null && Math.abs(nextOrder - prevOrder) < 0.1) ||
+      (prevOrder === null && nextOrder !== null && nextOrder === 0) ||
+      (prevOrder !== null && nextOrder === null && prevOrder === 0);
+
+    if (needsRenormalization) {
+      // Renormalize all photos in the group with proper spacing
+      const step = 1000;
+      const renormalizeUpdates = [];
+      
+      for (let i = 0; i < ids.length; i++) {
+        const photoId = ids[i];
+        const newSortOrder = i * step;
+        renormalizeUpdates.push({ photoId, sortOrder: newSortOrder });
+      }
+      
+      // Apply renormalization to database and local state
+      await Promise.all(renormalizeUpdates.map(async ({ photoId, sortOrder }) => {
+        try {
+          await pb.collection('photos').update(photoId, { sortOrder });
+          setGroupPhotoSortOrder(groupId, photoId, sortOrder);
+        } catch (error) {
+          console.error('Error renormalizing group photo sort order:', error);
+        }
+      }));
+      
+      return; // Renormalization done, the UI will update
+    }
+
     let newOrder = 0;
     if (prevOrder === null && nextOrder === null) {
       newOrder = 0;
@@ -912,9 +1027,10 @@ const reorderItems = async ({ sourceId, targetId, groupId }) => {
       newOrder = prevOrder + (nextOrder - prevOrder) / 2;
     }
 
-    setGroupPhotoSortOrder(groupId, sourceId, newOrder);
     try {
       await pb.collection('photos').update(sourceId, { sortOrder: newOrder });
+      // Only update local state after database update succeeds
+      setGroupPhotoSortOrder(groupId, sourceId, newOrder);
     } catch (error) {
       console.error('Error updating group photo sort order:', error);
     }
@@ -939,6 +1055,40 @@ const reorderItems = async ({ sourceId, targetId, groupId }) => {
   const prevOrder = typeof prevItem?.sortOrder === 'number' ? prevItem.sortOrder : null;
   const nextOrder = typeof nextItem?.sortOrder === 'number' ? nextItem.sortOrder : null;
 
+  // Check if sortOrders are too close or identical (need renormalization)
+  const needsRenormalization = 
+    (prevOrder !== null && nextOrder !== null && Math.abs(nextOrder - prevOrder) < 0.1) ||
+    (prevOrder === null && nextOrder !== null && nextOrder === 0) ||
+    (prevOrder !== null && nextOrder === null && prevOrder === 0);
+
+  if (needsRenormalization) {
+    // Renormalize all items with proper spacing
+    const step = 1000;
+    const renormalizeUpdates = [];
+    
+    for (let i = 0; i < ids.length; i++) {
+      const itemId = ids[i];
+      const item = baseItems.value.find(it => it.id === itemId);
+      if (!item) continue;
+      
+      const newSortOrder = i * step;
+      const collectionName = item.isGroup ? 'groups' : 'photos';
+      renormalizeUpdates.push({ itemId, item, sortOrder: newSortOrder, collectionName });
+    }
+    
+    // Apply renormalization to database and local state
+    await Promise.all(renormalizeUpdates.map(async ({ itemId, item, sortOrder, collectionName }) => {
+      try {
+        await pb.collection(collectionName).update(itemId, { sortOrder });
+        setItemSortOrder(itemId, item.isGroup, sortOrder);
+      } catch (error) {
+        console.error('Error renormalizing item sort order:', error);
+      }
+    }));
+    
+    return; // Renormalization done, the UI will update
+  }
+
   let newOrder = 0;
   if (prevOrder === null && nextOrder === null) {
     newOrder = 0;
@@ -950,10 +1100,11 @@ const reorderItems = async ({ sourceId, targetId, groupId }) => {
     newOrder = prevOrder + (nextOrder - prevOrder) / 2;
   }
 
-  setItemSortOrder(sourceId, sourceItem.isGroup, newOrder);
   try {
     const collectionName = sourceItem.isGroup ? 'groups' : 'photos';
     await pb.collection(collectionName).update(sourceId, { sortOrder: newOrder });
+    // Only update local state after database update succeeds
+    setItemSortOrder(sourceId, sourceItem.isGroup, newOrder);
   } catch (error) {
     console.error('Error updating sort order:', error);
   }
@@ -961,16 +1112,121 @@ const reorderItems = async ({ sourceId, targetId, groupId }) => {
 
 // Handle group expansion when selection mode changes
 watch(() => props.selectionMode, (newValue, oldValue) => {
-  if (!newValue) {
-    // When exiting selection/edit mode, clear selection
+  if (newValue && !oldValue) {
+    // When entering selection mode, save the current expanded groups state
+    expandedGroupsBeforeSelection.value = new Set(expandedGroups.value);
+  } else if (!newValue && oldValue) {
+    // When exiting selection mode, clear selection
     clearSelectionState();
-    // Don't collapse groups - let them stay as they are
+    
+    // Restore the expanded groups state from before selection mode was activated
+    // If no groups were expanded before, this will collapse all groups
+    expandedGroups.value = new Set(expandedGroupsBeforeSelection.value);
+    expandedGroupsBeforeSelection.value = new Set(); // Clear the saved state
   }
 });
 
 // Clear selection
 const clearSelection = () => {
   clearSelectionState();
+};
+
+const extractMetadata = async (file) => {
+  try {
+    const exifData = await exifr.parse(file, {
+      tiff: true,
+      exif: true,
+      gps: true,
+      ifd0: true,
+      ifd1: true,
+      interop: true
+    });
+
+    if (!exifData) {
+      return null;
+    }
+
+    return {
+      exif: exifData,
+      cameraMake: exifData.Make || null,
+      cameraModel: exifData.Model || null,
+      lens: exifData.LensModel || exifData.LensInfo || null,
+      iso: exifData.ISO || null,
+      shutterSpeed: exifData.ExposureTime ? `1/${Math.round(1 / exifData.ExposureTime)}` : null,
+      aperture: exifData.FNumber || null,
+      focalLength: exifData.FocalLength || null,
+      dateTaken: exifData.DateTimeOriginal || exifData.DateTime || null,
+      latitude: exifData.latitude || null,
+      longitude: exifData.longitude || null,
+      width: exifData.ImageWidth || exifData.ExifImageWidth || null,
+      height: exifData.ImageHeight || exifData.ExifImageHeight || null,
+      orientation: exifData.Orientation || null,
+      fileSize: file.size
+    };
+  } catch (error) {
+    console.error('Error extracting EXIF data:', error);
+    return null;
+  }
+};
+
+const triggerReplace = () => {
+  if (replacing.value) return;
+  if (!replaceInput.value) return;
+  replaceInput.value.click();
+};
+
+const handleReplaceSelect = async (event) => {
+  const file = event?.target?.files?.[0];
+  event.target.value = '';
+  if (!file) return;
+  await replaceSelectedPhoto(file);
+};
+
+const replaceSelectedPhoto = async (file) => {
+  const target = selectedPhotosData.value[0];
+  if (!target?.id) return;
+  if (!pb.authStore.isValid) return;
+
+  replacing.value = true;
+  try {
+    const metadata = await extractMetadata(file);
+    const formData = new FormData();
+    formData.append('photo', file);
+
+    const appendValue = (key, value) => {
+      formData.append(key, value ?? '');
+    };
+
+    appendValue('exif', metadata?.exif ? JSON.stringify(metadata.exif) : '');
+    appendValue('cameraMake', metadata?.cameraMake ?? '');
+    appendValue('cameraModel', metadata?.cameraModel ?? '');
+    appendValue('lens', metadata?.lens ?? '');
+    appendValue('iso', metadata?.iso != null ? metadata.iso.toString() : '');
+    appendValue('shutterSpeed', metadata?.shutterSpeed ?? '');
+    appendValue('aperture', metadata?.aperture != null ? metadata.aperture.toString() : '');
+    appendValue('focalLength', metadata?.focalLength != null ? metadata.focalLength.toString() : '');
+    if (metadata?.dateTaken) {
+      const dateStr = metadata.dateTaken instanceof Date
+        ? metadata.dateTaken.toISOString()
+        : metadata.dateTaken;
+      appendValue('dateTaken', dateStr);
+    } else {
+      appendValue('dateTaken', '');
+    }
+    appendValue('latitude', metadata?.latitude != null ? metadata.latitude.toString() : '');
+    appendValue('longitude', metadata?.longitude != null ? metadata.longitude.toString() : '');
+    appendValue('width', metadata?.width != null ? metadata.width.toString() : '');
+    appendValue('height', metadata?.height != null ? metadata.height.toString() : '');
+    appendValue('orientation', metadata?.orientation != null ? metadata.orientation.toString() : '');
+    appendValue('fileSize', metadata?.fileSize != null ? metadata.fileSize.toString() : '');
+
+    await pb.collection('photos').update(target.id, formData);
+    refresh();
+  } catch (error) {
+    console.error('Error replacing photo:', error);
+  } finally {
+    replacing.value = false;
+  }
 };
 
 const createQuickGroup = async () => {
@@ -981,12 +1237,20 @@ const createQuickGroup = async () => {
   try {
     const photoIds = selectedPhotosData.value.map(photo => photo.id);
     const coverPhotoId = photoIds[0];
+    
+    // Choose a sortOrder for the new group
+    const firstPhoto = selectedPhotosData.value[0];
+    const groupSortOrder = props.albumId
+      ? getNextGroupSortOrder()
+      : (typeof firstPhoto.sortOrder === 'number' ? firstPhoto.sortOrder : 0);
+    
     const groupData = {
       title: '',
       description: '',
       coverPhoto: coverPhotoId,
       photos: photoIds,
-      user: currentUser.id
+      user: currentUser.id,
+      sortOrder: groupSortOrder
     };
     if (props.albumId) {
       groupData.album = props.albumId;
@@ -1002,7 +1266,6 @@ const createQuickGroup = async () => {
       await pb.collection('photos').update(photoId, updateData);
     }
 
-    emit('update:selectionMode', false);
     clearSelectionState();
     refresh();
   } catch (error) {
@@ -1013,8 +1276,17 @@ const createQuickGroup = async () => {
 // Handle item click (photo or group)
 const handleItemClick = (item) => {
   if (item.isGroup) {
-    // In selection mode, don't allow toggling groups
+    // In selection mode, allow switching between groups for editing
     if (props.selectionMode) {
+      // If this group is already expanded, do nothing
+      if (expandedGroups.value.has(item.id)) {
+        return;
+      }
+      
+      // Collapse all groups and expand this one
+      expandedGroups.value.clear();
+      clearSelectionState();
+      toggleGroupExpansion(item.id);
       return;
     }
     
@@ -1054,6 +1326,12 @@ const handleItemClick = (item) => {
 // Collapse all groups (called when clicking margins)
 const collapseAllGroups = () => {
   expandedGroups.value.clear();
+  expandingGroupId.value = null;
+};
+
+const expandAllGroups = () => {
+  if (groups.value.length === 0) return;
+  expandedGroups.value = new Set(groups.value.map(group => group.id));
   expandingGroupId.value = null;
 };
 
@@ -1116,8 +1394,11 @@ const confirmDelete = async (photo) => {
 // Delete photo
 const deletePhoto = async (photo) => {
   try {
+    let groupToCheck = null;
+    
     // If photo is in a group, remove it from the group first
     if (photo.group) {
+      groupToCheck = photo.group;
       const group = await pb.collection('groups').getOne(photo.group);
       const updatedPhotos = group.photos.filter(id => id !== photo.id);
       
@@ -1137,6 +1418,34 @@ const deletePhoto = async (photo) => {
     
     await pb.collection('photos').delete(photo.id);
     photos.value = photos.value.filter(p => p.id !== photo.id);
+    
+    // Check if the group has 0 or 1 photos left and handle accordingly
+    if (groupToCheck) {
+      try {
+        const group = await pb.collection('groups').getOne(groupToCheck);
+        if (!group.photos || group.photos.length === 0) {
+          // Delete empty group
+          await pb.collection('groups').delete(groupToCheck);
+          console.log(`Automatically deleted empty group: ${groupToCheck}`);
+        } else if (group.photos.length === 1) {
+          // Only one photo left - convert to standalone photo
+          const lastPhotoId = group.photos[0];
+          const groupSortOrder = group.sortOrder;
+          
+          // Remove group reference from the photo and set its sortOrder to group's sortOrder
+          await pb.collection('photos').update(lastPhotoId, { 
+            group: '',
+            sortOrder: groupSortOrder
+          });
+          
+          // Delete the group
+          await pb.collection('groups').delete(groupToCheck);
+          console.log(`Automatically deleted single-photo group: ${groupToCheck}, photo ${lastPhotoId} is now standalone`);
+        }
+      } catch (error) {
+        console.error(`Error checking/deleting group ${groupToCheck}:`, error);
+      }
+    }
     
     // Close lightbox if deleted photo was open
     if (selectedPhoto.value?.id === photo.id) {
@@ -1173,17 +1482,82 @@ const confirmDeleteSelected = async () => {
   await alert.present();
 };
 
+const promptSetLocation = async () => {
+  if (!isAuthenticated.value || selectedPhotos.value.length === 0) return;
+
+  const photoCount = selectedPhotos.value.length;
+  const alert = await alertController.create({
+    header: 'Set Location',
+    message: `Set a location for ${photoCount} photo${photoCount !== 1 ? 's' : ''}.`,
+    inputs: [
+      {
+        name: 'location',
+        type: 'text',
+        placeholder: 'Add location'
+      }
+    ],
+    buttons: [
+      {
+        text: 'Cancel',
+        role: 'cancel'
+      },
+      {
+        text: 'Save',
+        handler: (data) => {
+          const location = data?.location?.trim() || '';
+          updateSelectedLocations(location);
+        }
+      }
+    ]
+  });
+
+  await alert.present();
+};
+
+const updateSelectedLocations = async (location) => {
+  if (!isAuthenticated.value || selectedPhotos.value.length === 0) return;
+
+  const photoIds = [...new Set(selectedPhotos.value)];
+  try {
+    await Promise.all(photoIds.map(photoId => {
+      return pb.collection('photos').update(photoId, { location });
+    }));
+
+    photos.value = photos.value.map(photo =>
+      photoIds.includes(photo.id) ? { ...photo, location } : photo
+    );
+
+    groups.value = groups.value.map(group => {
+      if (!group.expand?.photos) return group;
+      const updatedPhotos = group.expand.photos.map(photo =>
+        photoIds.includes(photo.id) ? { ...photo, location } : photo
+      );
+      return {
+        ...group,
+        expand: {
+          ...group.expand,
+          photos: updatedPhotos
+        }
+      };
+    });
+  } catch (error) {
+    console.error('Error updating photo locations:', error);
+  }
+};
+
 // Delete multiple selected photos
 const deleteSelectedPhotos = async () => {
   if (selectedPhotos.value.length === 0) return;
   
   try {
     const photosToDelete = selectedPhotosData.value;
+    const groupsToCheck = new Set(); // Track groups that may become empty or single-photo
     
     // Delete each photo
     for (const photo of photosToDelete) {
       // If photo is in a group, remove it from the group first
       if (photo.group) {
+        groupsToCheck.add(photo.group); // Track this group
         const group = await pb.collection('groups').getOne(photo.group);
         const updatedPhotos = group.photos.filter(id => id !== photo.id);
         
@@ -1205,6 +1579,34 @@ const deleteSelectedPhotos = async () => {
       await pb.collection('photos').delete(photo.id);
     }
     
+    // Check if any groups have 0 or 1 photos left and handle accordingly
+    for (const groupId of groupsToCheck) {
+      try {
+        const group = await pb.collection('groups').getOne(groupId);
+        if (!group.photos || group.photos.length === 0) {
+          // Delete empty group
+          await pb.collection('groups').delete(groupId);
+          console.log(`Automatically deleted empty group: ${groupId}`);
+        } else if (group.photos.length === 1) {
+          // Only one photo left - convert to standalone photo
+          const lastPhotoId = group.photos[0];
+          const groupSortOrder = group.sortOrder;
+          
+          // Remove group reference from the photo and set its sortOrder to group's sortOrder
+          await pb.collection('photos').update(lastPhotoId, { 
+            group: '',
+            sortOrder: groupSortOrder
+          });
+          
+          // Delete the group
+          await pb.collection('groups').delete(groupId);
+          console.log(`Automatically deleted single-photo group: ${groupId}, photo ${lastPhotoId} is now standalone`);
+        }
+      } catch (error) {
+        console.error(`Error checking/deleting group ${groupId}:`, error);
+      }
+    }
+    
     // Update local state
     photos.value = photos.value.filter(p => !selectedPhotos.value.includes(p.id));
     
@@ -1213,8 +1615,12 @@ const deleteSelectedPhotos = async () => {
       selectedPhoto.value = null;
     }
     
-    // Clear selection
+    // Clear selection and exit selection mode if in edit mode
     clearSelectionState();
+    if (isEditMode.value) {
+      emit('update:selectionMode', false);
+      expandedGroups.value.clear();
+    }
     
     // Refresh to update groups
     refresh();
@@ -1274,24 +1680,79 @@ const removePhotosFromGroup = async () => {
     // Filter out the selected photos from the group
     const updatedPhotos = group.photos.filter(id => !selectedPhotos.value.includes(id));
     
-    // Update group photos
-    await pb.collection('groups').update(groupId, {
-      photos: updatedPhotos
-    });
-    
-    // If the cover photo was removed, set a new one or clear it
-    if (selectedPhotos.value.includes(group.coverPhoto)) {
-      const newCoverPhoto = updatedPhotos.length > 0 ? updatedPhotos[0] : '';
+    // Check if the group will have 0 or 1 photos left after removal
+    if (updatedPhotos.length === 0) {
+      // Group will be empty - delete it
+      await pb.collection('groups').delete(groupId);
+      console.log(`Automatically deleted empty group: ${groupId}`);
+      
+      // Update removed photos to be standalone and positioned near the group
+      const groupSortOrder = typeof group.sortOrder === 'number' ? group.sortOrder : 0;
+      const sortOrderStep = 0.1;
+      
+      for (let i = 0; i < selectedPhotos.value.length; i++) {
+        const photoId = selectedPhotos.value[i];
+        const newSortOrder = groupSortOrder + sortOrderStep * (i + 1);
+        
+        await pb.collection('photos').update(photoId, {
+          group: '',
+          sortOrder: newSortOrder
+        });
+      }
+    } else if (updatedPhotos.length === 1) {
+      // Only one photo left - convert to standalone and delete group
+      const lastPhotoId = updatedPhotos[0];
+      const groupSortOrder = typeof group.sortOrder === 'number' ? group.sortOrder : 0;
+      
+      // Update the last remaining photo to be standalone at the group's position
+      await pb.collection('photos').update(lastPhotoId, { 
+        group: '',
+        sortOrder: groupSortOrder
+      });
+      
+      // Delete the group
+      await pb.collection('groups').delete(groupId);
+      console.log(`Automatically deleted single-photo group: ${groupId}, photo ${lastPhotoId} is now standalone`);
+      
+      // Update removed photos to appear right after
+      const sortOrderStep = 0.1;
+      for (let i = 0; i < selectedPhotos.value.length; i++) {
+        const photoId = selectedPhotos.value[i];
+        const newSortOrder = groupSortOrder + sortOrderStep * (i + 1);
+        
+        await pb.collection('photos').update(photoId, {
+          group: '',
+          sortOrder: newSortOrder
+        });
+      }
+    } else {
+      // Group still has 2+ photos - proceed normally
+      // Update group photos
       await pb.collection('groups').update(groupId, {
-        coverPhoto: newCoverPhoto
+        photos: updatedPhotos
       });
-    }
-    
-    // Update the photos to remove the group reference
-    for (const photoId of selectedPhotos.value) {
-      await pb.collection('photos').update(photoId, {
-        group: ''
-      });
+      
+      // If the cover photo was removed, set a new one
+      if (selectedPhotos.value.includes(group.coverPhoto)) {
+        const newCoverPhoto = updatedPhotos[0];
+        await pb.collection('groups').update(groupId, {
+          coverPhoto: newCoverPhoto
+        });
+      }
+      
+      // Update the photos to remove the group reference and set sortOrder to appear next to the group
+      const groupSortOrder = typeof group.sortOrder === 'number' ? group.sortOrder : 0;
+      const sortOrderStep = 0.1;
+      
+      for (let i = 0; i < selectedPhotos.value.length; i++) {
+        const photoId = selectedPhotos.value[i];
+        const newSortOrder = groupSortOrder + sortOrderStep * (i + 1);
+        
+        await pb.collection('photos').update(photoId, {
+          group: '',
+          sortOrder: newSortOrder
+        });
+      }
     }
     
     // Clear selection and exit selection mode
@@ -1374,7 +1835,10 @@ const refresh = () => {
 defineExpose({ 
   refresh,
   expandedGroups,
-  collapseAllGroups 
+  collapseAllGroups,
+  expandAllGroups,
+  groupCount,
+  areAllGroupsExpanded
 });
 
 onMounted(() => {

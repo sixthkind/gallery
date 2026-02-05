@@ -49,7 +49,9 @@ const collapseGroups = () => {
         ></div>
         
         <CommonContainer>
-          <GalleryPhotoUpload v-if="showUpload" @uploaded="refreshGallery" />
+          <div v-if="showUpload" class="mt-3">
+            <GalleryPhotoUpload @uploaded="refreshGallery" />
+          </div>
           <GalleryPhotoGallery 
             ref="galleryRef" 
             :selection-mode="selectionMode"

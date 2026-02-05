@@ -78,6 +78,28 @@
                   ></textarea>
                 </div>
                 <p class="text-xs text-gray-500">{{ formatFileSize(file.file.size) }}</p>
+                
+                <!-- Metadata indicator -->
+                <div v-if="file.metadata" class="mt-2 text-xs text-green-600 flex items-center gap-1">
+                  <Icon name="heroicons:check-circle-solid" class="text-sm" />
+                  <span>Metadata extracted</span>
+                </div>
+                
+                <!-- Metadata preview (collapsed by default) -->
+                <details v-if="file.metadata" class="mt-2 text-xs text-gray-600">
+                  <summary class="cursor-pointer hover:text-gray-800">View metadata</summary>
+                  <div class="mt-2 space-y-1 pl-2">
+                    <p v-if="file.metadata.cameraMake"><strong>Camera:</strong> {{ file.metadata.cameraMake }} {{ file.metadata.cameraModel }}</p>
+                    <p v-if="file.metadata.lens"><strong>Lens:</strong> {{ file.metadata.lens }}</p>
+                    <p v-if="file.metadata.iso"><strong>ISO:</strong> {{ file.metadata.iso }}</p>
+                    <p v-if="file.metadata.aperture"><strong>Aperture:</strong> f/{{ file.metadata.aperture }}</p>
+                    <p v-if="file.metadata.shutterSpeed"><strong>Shutter:</strong> {{ file.metadata.shutterSpeed }}s</p>
+                    <p v-if="file.metadata.focalLength"><strong>Focal Length:</strong> {{ file.metadata.focalLength }}mm</p>
+                    <p v-if="file.metadata.dateTaken"><strong>Date Taken:</strong> {{ new Date(file.metadata.dateTaken).toLocaleString() }}</p>
+                    <p v-if="file.metadata.latitude && file.metadata.longitude"><strong>GPS:</strong> {{ file.metadata.latitude.toFixed(6) }}, {{ file.metadata.longitude.toFixed(6) }}</p>
+                    <p v-if="file.metadata.width && file.metadata.height"><strong>Dimensions:</strong> {{ file.metadata.width }} x {{ file.metadata.height }}px</p>
+                  </div>
+                </details>
               </div>
               
               <!-- Remove Button -->
@@ -146,6 +168,7 @@
 <script setup>
 import { pb } from '#imports';
 import { ref, computed } from 'vue';
+import exifr from 'exifr';
 
 const props = defineProps({
   albumId: {
@@ -183,10 +206,56 @@ const handleFileSelect = (e) => {
   e.target.value = '';
 };
 
+// Extract EXIF metadata from image file
+const extractMetadata = async (file) => {
+  try {
+    const exifData = await exifr.parse(file, {
+      tiff: true,
+      exif: true,
+      gps: true,
+      ifd0: true,
+      ifd1: true,
+      interop: true
+    });
+
+    if (!exifData) {
+      return null;
+    }
+
+    // Extract common metadata fields
+    const metadata = {
+      exif: exifData, // Store full EXIF as JSON
+      cameraMake: exifData.Make || null,
+      cameraModel: exifData.Model || null,
+      lens: exifData.LensModel || exifData.LensInfo || null,
+      iso: exifData.ISO || null,
+      shutterSpeed: exifData.ExposureTime ? `1/${Math.round(1 / exifData.ExposureTime)}` : null,
+      aperture: exifData.FNumber || null,
+      focalLength: exifData.FocalLength || null,
+      dateTaken: exifData.DateTimeOriginal || exifData.DateTime || null,
+      latitude: exifData.latitude || null,
+      longitude: exifData.longitude || null,
+      width: exifData.ImageWidth || exifData.ExifImageWidth || null,
+      height: exifData.ImageHeight || exifData.ExifImageHeight || null,
+      orientation: exifData.Orientation || null,
+      fileSize: file.size
+    };
+
+    return metadata;
+  } catch (error) {
+    console.error('Error extracting EXIF data:', error);
+    return null;
+  }
+};
+
 // Add files to selection
-const addFiles = (files) => {
-  files.forEach(file => {
+const addFiles = async (files) => {
+  for (const file of files) {
     const reader = new FileReader();
+    
+    // Extract metadata first
+    const metadata = await extractMetadata(file);
+    
     reader.onload = (e) => {
       selectedFiles.value.push({
         file,
@@ -196,11 +265,12 @@ const addFiles = (files) => {
         uploading: false,
         uploaded: false,
         progress: 0,
-        error: null
+        error: null,
+        metadata: metadata
       });
     };
     reader.readAsDataURL(file);
-  });
+  }
 };
 
 // Remove file from selection
@@ -249,6 +319,34 @@ const uploadPhotos = async () => {
       if (fileObj.title) formData.append('title', fileObj.title);
       if (fileObj.description) formData.append('description', fileObj.description);
       if (props.albumId) formData.append('album', props.albumId);
+      
+      // Add metadata if available
+      if (fileObj.metadata) {
+        const metadata = fileObj.metadata;
+        
+        // Add metadata fields to form data
+        if (metadata.exif) formData.append('exif', JSON.stringify(metadata.exif));
+        if (metadata.cameraMake) formData.append('cameraMake', metadata.cameraMake);
+        if (metadata.cameraModel) formData.append('cameraModel', metadata.cameraModel);
+        if (metadata.lens) formData.append('lens', metadata.lens);
+        if (metadata.iso) formData.append('iso', metadata.iso.toString());
+        if (metadata.shutterSpeed) formData.append('shutterSpeed', metadata.shutterSpeed);
+        if (metadata.aperture) formData.append('aperture', metadata.aperture.toString());
+        if (metadata.focalLength) formData.append('focalLength', metadata.focalLength.toString());
+        if (metadata.dateTaken) {
+          // Convert date to ISO string if it's a Date object
+          const dateStr = metadata.dateTaken instanceof Date 
+            ? metadata.dateTaken.toISOString() 
+            : metadata.dateTaken;
+          formData.append('dateTaken', dateStr);
+        }
+        if (metadata.latitude) formData.append('latitude', metadata.latitude.toString());
+        if (metadata.longitude) formData.append('longitude', metadata.longitude.toString());
+        if (metadata.width) formData.append('width', metadata.width.toString());
+        if (metadata.height) formData.append('height', metadata.height.toString());
+        if (metadata.orientation) formData.append('orientation', metadata.orientation.toString());
+        if (metadata.fileSize) formData.append('fileSize', metadata.fileSize.toString());
+      }
       
       // Simulate progress for better UX (PocketBase doesn't provide real progress)
       const progressInterval = setInterval(() => {

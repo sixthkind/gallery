@@ -84,10 +84,27 @@ const hasExpandedGroups = computed(() => {
   return galleryRef.value?.expandedGroups?.size > 0;
 });
 
+const hasGroups = computed(() => {
+  return (galleryRef.value?.groupCount || 0) > 0;
+});
+
+const areAllGroupsExpanded = computed(() => {
+  return galleryRef.value?.areAllGroupsExpanded || false;
+});
+
 const collapseGroups = () => {
   if (galleryRef.value) {
     galleryRef.value.collapseAllGroups();
   }
+};
+
+const toggleAllGroups = () => {
+  if (!galleryRef.value) return;
+  if (areAllGroupsExpanded.value) {
+    galleryRef.value.collapseAllGroups();
+    return;
+  }
+  galleryRef.value.expandAllGroups();
 };
 
 const deleteAlbum = async () => {
@@ -153,7 +170,7 @@ watch(pendingTitle, () => {
         <!-- Left Margin Clickable Area -->
         <div 
           v-if="hasExpandedGroups"
-          class="fixed left-0 top-0 bottom-0 cursor-pointer hover:bg-gray-100/30 transition-colors z-10"
+          class="fixed left-0 top-0 bottom-0 cursor-pointer hover:bg-gray-100/30 dark:hover:bg-slate-800/20 transition-colors z-10"
           style="width: calc((100vw - min(1280px, 100vw - 2.5rem)) / 2);"
           @click.stop="collapseGroups"
           title="Click to collapse groups"
@@ -162,7 +179,7 @@ watch(pendingTitle, () => {
         <!-- Right Margin Clickable Area -->
         <div 
           v-if="hasExpandedGroups"
-          class="fixed right-0 top-0 bottom-0 cursor-pointer hover:bg-gray-100/30 transition-colors z-10"
+          class="fixed right-0 top-0 bottom-0 cursor-pointer hover:bg-gray-100/30 dark:hover:bg-slate-800/20 transition-colors z-10"
           style="width: calc((100vw - min(1280px, 100vw - 2.5rem)) / 2);"
           @click.stop="collapseGroups"
           title="Click to collapse groups"
@@ -185,7 +202,7 @@ watch(pendingTitle, () => {
                   :class="isAuthenticated ? 'cursor-pointer hover:text-gray-900' : ''"
                   @click="startTitleEdit"
                 >
-                  {{ album?.title || 'Album' }}
+                  {{ album?.title || '' }}
                 </h1>
                 <input
                   v-else
@@ -201,27 +218,41 @@ watch(pendingTitle, () => {
                 <p v-if="album?.description" class="text-sm text-gray-500 mt-1">{{ album.description }}</p>
               </div>
             </div>
-            <button
-              v-if="isAuthenticated"
-              @click="deleteAlbum"
-              :disabled="isDeleting"
-              class="bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors flex items-center gap-2"
-            >
-              <Icon
-                v-if="isDeleting"
-                name="svg-spinners:ring-resize"
-                class="text-base"
-              />
-              <span>Delete Album</span>
-            </button>
+            <div class="flex items-center gap-2">
+              <button
+                v-if="hasGroups"
+                @click="toggleAllGroups"
+                class="bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                :title="areAllGroupsExpanded ? 'Collapse All' : 'Expand All'"
+                :aria-label="areAllGroupsExpanded ? 'Collapse All' : 'Expand All'"
+              >
+                <Icon :name="areAllGroupsExpanded ? 'lucide:fold-horizontal' : 'lucide:unfold-horizontal'" class="text-lg" />
+              </button>
+              <button
+                v-if="isAuthenticated"
+                @click="deleteAlbum"
+                :disabled="isDeleting"
+                class="bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors flex items-center gap-2"
+              >
+                <Icon
+                  v-if="isDeleting"
+                  name="svg-spinners:ring-resize"
+                  class="text-base"
+                />
+                <span>Delete Album</span>
+              </button>
+            </div>
           </div>
 
-          <GalleryPhotoUpload v-if="showUpload" :album-id="albumId" @uploaded="refreshGallery" />
+          <div v-if="showUpload" class="mt-3">
+            <GalleryPhotoUpload :album-id="albumId" @uploaded="refreshGallery" />
+          </div>
           <GalleryPhotoGallery 
             ref="galleryRef" 
             :selection-mode="selectionMode"
             :current-layout="currentLayout"
             :album-id="albumId"
+            date-sort-direction="asc"
             @update:selection-mode="selectionMode = $event"
           />
         </CommonContainer>
