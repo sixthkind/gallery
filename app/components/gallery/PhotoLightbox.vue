@@ -428,7 +428,7 @@ const loadPhotoDetails = async () => {
 
 const addTag = async () => {
   if (!isAuthenticated.value) return;
-  const name = tagInput.value.trim();
+  const name = tagInput.value.trim().toLowerCase();
   if (!name) return;
   const safeName = name.replace(/"/g, '\\"');
 

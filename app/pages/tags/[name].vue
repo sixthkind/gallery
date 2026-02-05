@@ -278,25 +278,26 @@ watch(pendingTagName, () => {
         <div v-else-if="photos.length === 0" class="text-center py-20 text-gray-500">
           No photos with this tag.
         </div>
-        <GalleryPhotoGridLayout
-          v-else
-          :items="photos"
-          layout="grid"
-          :selection-mode="false"
-          :selected-photos="[]"
-          @photo-click="openLightbox"
-        >
-          <template #photo-item="{ item, getPhotoUrl }">
-            <div class="relative overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 aspect-square">
-              <img
-                :src="getPhotoUrl(item, '500x500')"
-                :alt="item.title || 'Photo'"
-                class="w-full h-full object-cover"
-                loading="lazy"
-              />
-            </div>
-          </template>
-        </GalleryPhotoGridLayout>
+        <div v-else class="tag-gallery-shell">
+          <GalleryPhotoGridLayout
+            :items="photos"
+            layout="grid"
+            :selection-mode="false"
+            :selected-photos="[]"
+            @photo-click="openLightbox"
+          >
+            <template #photo-item="{ item, getPhotoUrl }">
+              <div class="relative overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 aspect-square">
+                <img
+                  :src="getPhotoUrl(item, '500x500')"
+                  :alt="item.title || 'Photo'"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+            </template>
+          </GalleryPhotoGridLayout>
+        </div>
       </CommonContainer>
 
       <GalleryPhotoLightbox
@@ -310,3 +311,10 @@ watch(pendingTagName, () => {
     </ion-content>
   </ion-page>
 </template>
+
+<style scoped>
+.tag-gallery-shell {
+  position: relative;
+  padding: 2rem 0;
+}
+</style>

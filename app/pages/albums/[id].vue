@@ -244,7 +244,9 @@ watch(pendingTitle, () => {
             </div>
           </div>
 
-          <GalleryPhotoUpload v-if="showUpload" :album-id="albumId" @uploaded="refreshGallery" />
+          <div v-if="showUpload" class="mt-3">
+            <GalleryPhotoUpload :album-id="albumId" @uploaded="refreshGallery" />
+          </div>
           <GalleryPhotoGallery 
             ref="galleryRef" 
             :selection-mode="selectionMode"
