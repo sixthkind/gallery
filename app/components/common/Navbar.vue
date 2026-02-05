@@ -17,13 +17,15 @@
             <!-- Theme toggle -->
             <button
               @click="toggleDarkMode"
-              class="bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 inline-flex items-center justify-center leading-none hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
+              class="bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border px-3 py-2 inline-flex items-center justify-center leading-none hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
               :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
             >
-              <Icon
-                :name="isDark ? 'heroicons:sun' : 'heroicons:moon'"
-                class="w-5 h-5 text-gray-700 dark:text-slate-200"
-              />
+              <span class="inline-flex items-center justify-center rounded-md border border-slate-200/70 dark:border-slate-700/70 p-1">
+                <Icon
+                  :name="isDark ? 'heroicons:sun' : 'heroicons:moon'"
+                  class="w-5 h-5 text-gray-700 dark:text-slate-200"
+                />
+              </span>
             </button>
 
             <!-- Gallery Action Icons (only show on gallery page) -->
