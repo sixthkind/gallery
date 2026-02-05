@@ -114,7 +114,13 @@
   const isTyping = ref(false);
   const config = useRuntimeConfig();
   const openrouterAssetID = String(config.public.openrouterAssetID);
-  import OpenAI from 'openai';
+  // Don’t ship the OpenAI client in the default bundle.
+  // This page should only be usable during development.
+  if (!import.meta.dev) {
+    throw new Error('Playground is disabled in production builds');
+  }
+
+  const { default: OpenAI } = await import('openai');
   const API_KEY = (await pb.collection('_assets').getOne(openrouterAssetID)).title;
 
   const openai = new OpenAI({
@@ -142,9 +148,10 @@
   });
 
   const init = async () => {
-    let res = await pb.collection("clients").getFullList({
+    let res = (await pb.collection("clients").getList(1, 200, {
+      sort: 'name',
       expand: "tags"
-    });
+    })).items;
     clients.value = res.map((item) => ({
       label: item.name,
       value: item,
@@ -166,9 +173,11 @@
     }
 
     try {
-      let res = await pb.collection("items").getFullList({
-        expand: "tags"
-      });
+      // Avoid full-table scans for performance; cap results.
+    let res = (await pb.collection("items").getList(1, 200, {
+      sort: '-created',
+      expand: "tags"
+    })).items;
 
       // TODO
       // Just filtering for now. This obviously needs to be done on the server side permissions.

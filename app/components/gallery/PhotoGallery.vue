@@ -289,7 +289,14 @@
 import { pb } from '#imports';
 import { alertController } from '@ionic/vue';
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
-import exifr from 'exifr';
+// Lazy-load exifr only when needed (keeps initial bundle smaller)
+let _exifr = null;
+async function getExifr() {
+  if (_exifr) return _exifr;
+  const mod = await import('exifr');
+  _exifr = mod?.default || mod;
+  return _exifr;
+}
 
 const props = defineProps({
   selectionMode: {
@@ -1133,6 +1140,7 @@ const clearSelection = () => {
 
 const extractMetadata = async (file) => {
   try {
+    const exifr = await getExifr();
     const exifData = await exifr.parse(file, {
       tiff: true,
       exif: true,

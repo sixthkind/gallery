@@ -105,18 +105,24 @@ const fetchAlbums = async () => {
     await normalizeAlbumSortOrder(albums.value);
     const albumIds = albums.value.map(album => album.id);
     if (albumIds.length > 0) {
-      const photos = await pb.collection('photos').getFullList({
+      // Bound the amount of work: we only need a handful of recent photos to build previews.
+      // Avoid getFullList() here — it will scale poorly with large libraries.
+      const recent = await pb.collection('photos').getList(1, 250, {
         sort: '-dateTaken,-created',
-        filter: `album != ""`
+        filter: `album != ""`,
+        fields: 'id,album,group,photo,title,created,dateTaken,sortOrder'
       });
+
       const byAlbum = new Map();
-      photos.forEach(photo => {
+      (recent?.items || []).forEach(photo => {
         if (!photo.album || !albumIds.includes(photo.album)) return;
         if (!byAlbum.has(photo.album)) byAlbum.set(photo.album, []);
         byAlbum.get(photo.album).push(photo);
       });
+
       albumIds.forEach(albumId => {
         const list = byAlbum.get(albumId) || [];
+        // Already sorted by the query, but keep stable ordering if sortOrder exists.
         list.sort((a, b) => {
           const aOrder = typeof a.sortOrder === 'number' ? a.sortOrder : null;
           const bOrder = typeof b.sortOrder === 'number' ? b.sortOrder : null;
@@ -127,6 +133,7 @@ const fetchAlbums = async () => {
           const bDate = b.dateTaken || b.created || 0;
           return new Date(bDate) - new Date(aDate);
         });
+
         const seenGroups = new Set();
         const unique = [];
         for (const photo of list) {

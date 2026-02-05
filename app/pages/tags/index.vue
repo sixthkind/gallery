@@ -51,22 +51,13 @@ const buildSkeletonPills = () => {
 const fetchTags = async () => {
   loading.value = true;
   try {
-    const [tagRecords, photoRecords] = await Promise.all([
-      pb.collection('tags').getFullList({ sort: 'name' }),
-      pb.collection('photos').getFullList({ fields: 'id,tags' })
-    ]);
-
-    const counts = new Map();
-    photoRecords.forEach(photo => {
-      const photoTags = Array.isArray(photo.tags) ? photo.tags : [];
-      photoTags.forEach(tagId => {
-        counts.set(tagId, (counts.get(tagId) || 0) + 1);
-      });
-    });
+    // Fast path: load tags only (avoid scanning the entire photos table).
+    // If we want exact counts later, do it server-side (stored field or aggregation endpoint).
+    const tagRecords = await pb.collection('tags').getFullList({ sort: 'name' });
 
     tags.value = tagRecords.map(tag => ({
       ...tag,
-      photoCount: counts.get(tag.id) || 0
+      photoCount: 0
     }));
   } catch (error) {
     console.error('Error fetching tags:', error);
@@ -127,7 +118,7 @@ watch(loading, (isLoading) => {
             @click="openTag(tag)"
             class="px-4 py-2 rounded-full backdrop-blur border border-gray-200 text-sm text-slate-800 hover:text-slate-900 transition-colors flex items-center gap-2"
             :style="getTagStyle(tag)"
-            :title="`${tag.photoCount || 0} photos`"
+            :title="tag.photoCount ? `${tag.photoCount} photos` : ''"
           >
             <span>#{{ tag.name }}</span>
           </button>
