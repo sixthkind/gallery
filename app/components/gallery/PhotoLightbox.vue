@@ -40,7 +40,7 @@
         <div class="flex-grow flex items-center justify-center w-full mb-4">
           <img
             :src="fullSizeRequested ? getFullPhotoUrl(photo) : getPhotoUrl(photo, '1200x0')"
-            :alt="photo.title || 'Photo'"
+            :alt="displayTitle"
             class="max-w-full max-h-[calc(100vh-200px)] object-contain"
             @click.stop
             @load="handleImageLoad"
@@ -63,12 +63,32 @@
             ]"
             @click.stop
           >
-          <h2 v-if="photo.title" class="text-white text-2xl font-bold mb-2">
-            {{ photo.title }}
-          </h2>
-          <p v-if="photo.description" class="text-white/90 text-base">
-            {{ photo.description }}
-          </p>
+          <div v-if="showTitle" class="mb-3">
+            <div v-if="showTitle">
+              <h2
+                v-if="!isEditingTitle"
+                class="text-lg"
+                :class="[
+                  localTitle ? 'text-white' : 'text-white/50',
+                  isAuthenticated ? 'cursor-pointer hover:text-white' : ''
+                ]"
+                @click="startTitleEdit"
+              >
+                {{ titleDisplayText }}
+              </h2>
+              <input
+                v-else
+                v-model="pendingTitle"
+                type="text"
+                maxlength="200"
+                class="text-lg text-white w-full bg-transparent border-b border-white/30 focus:outline-none focus:border-white/70"
+                @blur="stopTitleEdit"
+                @keydown.enter.prevent="stopTitleEdit"
+                @keydown.esc.prevent="stopTitleEdit"
+                aria-label="Photo title"
+              />
+            </div>
+          </div>
           <div class="mt-3 flex flex-wrap gap-2 items-center">
             <button
               v-for="tag in tags"
@@ -116,8 +136,32 @@
             </button>
           </div>
           <div class="flex items-center gap-4 mt-3 text-sm text-white/70">
-            <span>{{ formatDate(photo.dateTaken || photo.created) }}</span>
-            <span v-if="photos.length > 1">
+            <div class="flex items-center gap-3">
+              <span>{{ formatDate(photo.dateTaken || photo.created) }}</span>
+              <div v-if="showLocation" class="flex items-center gap-2">
+                <span class="text-white/40">•</span>
+                <span
+                  v-if="!isEditingLocation"
+                  class="text-white/70"
+                  :class="isAuthenticated ? 'cursor-pointer hover:text-white' : ''"
+                  @click="startLocationEdit"
+                >
+                  {{ locationDisplayText }}
+                </span>
+                <input
+                  v-else
+                  v-model="pendingLocation"
+                  type="text"
+                  maxlength="200"
+                  class="text-sm text-white w-56 max-w-full bg-transparent border-b border-white/30 focus:outline-none focus:border-white/70"
+                  @blur="stopLocationEdit"
+                  @keydown.enter.prevent="stopLocationEdit"
+                  @keydown.esc.prevent="stopLocationEdit"
+                  aria-label="Photo location"
+                />
+              </div>
+            </div>
+            <span v-if="photos.length > 1" class="ml-auto">
               {{ currentIndex + 1 }} / {{ photos.length }}
             </span>
           </div>
@@ -132,10 +176,6 @@
               <div v-if="photo.cameraMake || photo.cameraModel" class="flex flex-col">
                 <span class="text-white/60">Camera</span>
                 <span class="text-white">{{ photo.cameraMake }} {{ photo.cameraModel }}</span>
-              </div>
-              <div v-if="photo.lens" class="flex flex-col">
-                <span class="text-white/60">Lens</span>
-                <span class="text-white">{{ photo.lens }}</span>
               </div>
               <div v-if="photo.iso" class="flex flex-col">
                 <span class="text-white/60">ISO</span>
@@ -152,10 +192,6 @@
               <div v-if="photo.focalLength" class="flex flex-col">
                 <span class="text-white/60">Focal Length</span>
                 <span class="text-white">{{ photo.focalLength }}mm</span>
-              </div>
-              <div v-if="photo.dateTaken" class="flex flex-col">
-                <span class="text-white/60">Date Taken</span>
-                <span class="text-white">{{ formatDate(photo.dateTaken) }}</span>
               </div>
               <div v-if="photo.width && photo.height" class="flex flex-col">
                 <span class="text-white/60">Dimensions</span>
@@ -189,7 +225,7 @@
 
 <script setup>
 import { pb } from '#imports';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 
 const props = defineProps({
@@ -215,6 +251,20 @@ const isAuthenticated = computed(() => pb.authStore.isValid);
 const fullSizeRequested = ref(false);
 const fullSizeLoading = ref(false);
 const fullSizeLoaded = ref(false);
+const isEditingTitle = ref(false);
+const isEditingLocation = ref(false);
+const pendingTitle = ref('');
+const pendingLocation = ref('');
+const localTitle = ref('');
+const localLocation = ref('');
+const titleSaveTimer = ref(null);
+const locationSaveTimer = ref(null);
+
+const displayTitle = computed(() => localTitle.value || props.photo?.title || 'Photo');
+const showTitle = computed(() => isAuthenticated.value || !!localTitle.value);
+const showLocation = computed(() => isAuthenticated.value || !!localLocation.value);
+const titleDisplayText = computed(() => localTitle.value || (isAuthenticated.value ? 'Add title' : ''));
+const locationDisplayText = computed(() => localLocation.value || (isAuthenticated.value ? 'Add location' : ''));
 
 // Get current photo index
 const currentIndex = computed(() => {
@@ -257,17 +307,86 @@ const hasMetadata = (photo) => {
   return !!(
     photo.cameraMake || 
     photo.cameraModel || 
-    photo.lens || 
     photo.iso || 
     photo.aperture || 
     photo.shutterSpeed || 
     photo.focalLength || 
-    photo.dateTaken || 
     photo.width || 
     photo.height || 
     photo.fileSize || 
     (photo.latitude && photo.longitude)
   );
+};
+
+const syncEditableFields = () => {
+  clearTimeout(titleSaveTimer.value);
+  clearTimeout(locationSaveTimer.value);
+  localTitle.value = props.photo?.title || '';
+  localLocation.value = props.photo?.location || '';
+  pendingTitle.value = localTitle.value;
+  pendingLocation.value = localLocation.value;
+  isEditingTitle.value = false;
+  isEditingLocation.value = false;
+};
+
+const startTitleEdit = async () => {
+  if (!isAuthenticated.value) return;
+  isEditingTitle.value = true;
+  pendingTitle.value = localTitle.value;
+  await nextTick();
+};
+
+const startLocationEdit = async () => {
+  if (!isAuthenticated.value) return;
+  isEditingLocation.value = true;
+  pendingLocation.value = localLocation.value;
+  await nextTick();
+};
+
+const queueTitleSave = () => {
+  if (!isAuthenticated.value || !props.photo?.id) return;
+  clearTimeout(titleSaveTimer.value);
+  const photoId = props.photo.id;
+  titleSaveTimer.value = setTimeout(async () => {
+    const newTitle = pendingTitle.value.trim();
+    if (newTitle === localTitle.value) return;
+    try {
+      const updated = await pb.collection('photos').update(photoId, {
+        title: newTitle
+      });
+      localTitle.value = updated?.title ?? newTitle;
+    } catch (error) {
+      console.error('Error updating photo title:', error);
+    }
+  }, 400);
+};
+
+const queueLocationSave = () => {
+  if (!isAuthenticated.value || !props.photo?.id) return;
+  clearTimeout(locationSaveTimer.value);
+  const photoId = props.photo.id;
+  locationSaveTimer.value = setTimeout(async () => {
+    const newLocation = pendingLocation.value.trim();
+    if (newLocation === localLocation.value) return;
+    try {
+      const updated = await pb.collection('photos').update(photoId, {
+        location: newLocation
+      });
+      localLocation.value = updated?.location ?? newLocation;
+    } catch (error) {
+      console.error('Error updating photo location:', error);
+    }
+  }, 400);
+};
+
+const stopTitleEdit = () => {
+  isEditingTitle.value = false;
+  queueTitleSave();
+};
+
+const stopLocationEdit = () => {
+  isEditingLocation.value = false;
+  queueLocationSave();
 };
 
 // Close lightbox
@@ -289,13 +408,21 @@ const onMetadataToggle = (event) => {
   isMetadataExpanded.value = event.target.open;
 };
 
-const loadTags = async () => {
+const loadPhotoDetails = async () => {
   if (!props.photo?.id) return;
   try {
     const record = await pb.collection('photos').getOne(props.photo.id, { expand: 'tags' });
     tags.value = record.expand?.tags || [];
+    if (!isEditingTitle.value) {
+      localTitle.value = record.title || '';
+      pendingTitle.value = localTitle.value;
+    }
+    if (!isEditingLocation.value) {
+      localLocation.value = record.location || '';
+      pendingLocation.value = localLocation.value;
+    }
   } catch (error) {
-    console.error('Error loading tags:', error);
+    console.error('Error loading photo details:', error);
   }
 };
 
@@ -394,7 +521,8 @@ onMounted(() => {
   document.body.style.overflow = 'hidden';
   document.addEventListener('touchmove', preventScroll, { passive: false });
 
-  loadTags();
+  syncEditableFields();
+  loadPhotoDetails();
 });
 
 onUnmounted(() => {
@@ -404,6 +532,8 @@ onUnmounted(() => {
   // Restore body scroll
   document.body.style.overflow = '';
   document.removeEventListener('touchmove', preventScroll);
+  clearTimeout(titleSaveTimer.value);
+  clearTimeout(locationSaveTimer.value);
 });
 
 watch(() => props.photo?.id, () => {
@@ -413,7 +543,20 @@ watch(() => props.photo?.id, () => {
   fullSizeRequested.value = false;
   fullSizeLoading.value = false;
   fullSizeLoaded.value = false;
-  loadTags();
+  syncEditableFields();
+  loadPhotoDetails();
+});
+
+watch(pendingTitle, () => {
+  if (isEditingTitle.value) {
+    queueTitleSave();
+  }
+});
+
+watch(pendingLocation, () => {
+  if (isEditingLocation.value) {
+    queueLocationSave();
+  }
 });
 </script>
 
