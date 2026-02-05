@@ -9,9 +9,17 @@
 
 /* Background styling for ion-content */
 ion-content {
-  --background: #F7F6F2;
+  --background: var(--app-bg);
   --padding-top: env(safe-area-inset-top);
   --padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Ensure ionic text defaults are readable in dark mode */
+html.dark, body.dark {
+  --ion-text-color: #e2e8f0; /* slate-200 */
+  --ion-text-color-rgb: 226, 232, 240;
+  --ion-color-step-850: #e2e8f0;
+  --ion-color-step-950: #f8fafc;
 }
 
 ion-label, ion-text {

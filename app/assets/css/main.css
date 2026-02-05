@@ -7,6 +7,59 @@
   --animate-duration: 0.5s;
   --animate-delay: 1s;
   --animate-repeat: 1;
+
+  /* App theme tokens */
+  --app-bg: #F7F6F2;
+  --surface-1: rgba(255, 255, 255, 0.70);
+  --surface-2: rgba(255, 255, 255, 0.90);
+  --surface-3: rgba(255, 255, 255, 0.30);
+  --border-color: rgba(15, 23, 42, 0.12); /* slate-900 @ ~12% */
+  --text-muted: rgba(100, 116, 139, 1); /* slate-500 */
+  --icon-muted: rgba(100, 116, 139, 0.9);
+}
+
+html.dark,
+body.dark {
+  --app-bg: #0b0f14;
+  --surface-1: rgba(15, 23, 42, 0.55);
+  --surface-2: rgba(15, 23, 42, 0.75);
+  --surface-3: rgba(2, 6, 23, 0.35);
+  --border-color: rgba(148, 163, 184, 0.18); /* slate-400 @ ~18% */
+  --text-muted: rgba(148, 163, 184, 1); /* slate-400 */
+  --icon-muted: rgba(148, 163, 184, 0.9);
+}
+
+html,
+body,
+#__nuxt,
+ion-app {
+  background-color: var(--app-bg);
+  color: rgb(15 23 42); /* slate-900 */
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+html.dark,
+body.dark {
+  color: rgb(226 232 240); /* slate-200 */
+}
+
+ion-app {
+  /* Help Ionic components pick up the right base background */
+  --ion-background-color: var(--app-bg);
+}
+
+/* Ionic containers often paint their own backgrounds */
+ion-content {
+  --background: var(--app-bg);
+}
+
+/* Stronger override: ion-content renders its background in a shadow part */
+ion-content::part(background) {
+  background: var(--app-bg) !important;
+}
+
+.ion-page {
+  background: var(--app-bg);
 }
 
 :root, :before, :after, * {
@@ -133,4 +186,37 @@
   .animated[class*='Out'] {
     opacity: 0;
   }
+}
+
+/*
+  Dark-mode compatibility layer
+  Many components currently hardcode Tailwind text colors (text-gray-XXX, text-slate-XXX).
+  Until we add proper `dark:` variants everywhere, remap the common ones here.
+*/
+html.dark .text-gray-900 { color: rgb(248 250 252) !important; } /* slate-50 */
+html.dark .text-gray-800 { color: rgb(241 245 249) !important; } /* slate-100 */
+html.dark .text-gray-700 { color: rgb(226 232 240) !important; } /* slate-200 */
+html.dark .text-gray-600 { color: rgb(203 213 225) !important; } /* slate-300 */
+html.dark .text-gray-500 { color: rgb(148 163 184) !important; } /* slate-400 */
+html.dark .text-gray-400 { color: rgb(148 163 184) !important; }
+html.dark .text-gray-300 { color: rgb(203 213 225) !important; }
+
+html.dark .text-slate-800 { color: rgb(241 245 249) !important; }
+html.dark .text-slate-700 { color: rgb(226 232 240) !important; }
+html.dark .text-slate-600 { color: rgb(203 213 225) !important; }
+html.dark .text-slate-500 { color: rgb(148 163 184) !important; }
+html.dark .text-slate-400 { color: rgb(148 163 184) !important; }
+html.dark .text-slate-300 { color: rgb(203 213 225) !important; }
+
+html.dark a { color: inherit; }
+
+/* Force dark skeletons globally (overrides any component-scoped skeleton CSS) */
+html.dark .skeleton-tile {
+  background: linear-gradient(90deg, rgba(30, 41, 59, 0.65) 0%, rgba(51, 65, 85, 0.65) 50%, rgba(30, 41, 59, 0.65) 100%) !important;
+  background-size: 200% 100% !important;
+}
+
+html.dark .tag-skeleton-pill {
+  background: linear-gradient(90deg, rgba(30, 41, 59, 0.65) 0%, rgba(51, 65, 85, 0.65) 50%, rgba(30, 41, 59, 0.65) 100%) !important;
+  background-size: 200% 100% !important;
 }

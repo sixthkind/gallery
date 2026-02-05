@@ -1,6 +1,12 @@
 /// <reference path="../pb_data/types.d.ts" />
 migrate((app) => {
-  const collection = app.findCollectionByNameOrId("pbc_2468135790")
+  let collection
+  try {
+    collection = app.findCollectionByNameOrId("albums")
+  } catch (e) {
+    // Collection doesn't exist in this DB state; skip.
+    return
+  }
 
   // add field
   collection.fields.addAt(5, new Field({
@@ -18,7 +24,13 @@ migrate((app) => {
 
   return app.save(collection)
 }, (app) => {
-  const collection = app.findCollectionByNameOrId("pbc_2468135790")
+  let collection
+  try {
+    collection = app.findCollectionByNameOrId("albums")
+  } catch (e) {
+    // Collection doesn't exist in this DB state; skip.
+    return
+  }
 
   // remove field
   collection.fields.removeById("number1063427325")

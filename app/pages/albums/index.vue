@@ -347,7 +347,7 @@ watch(() => route.fullPath, () => {
           @reorder="reorderAlbums"
         >
           <template #photo-item="{ item }">
-            <div class="relative overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 bg-gray-50" style="aspect-ratio: 1 / 1;">
+            <div class="relative overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 bg-gray-50 dark:bg-slate-900/40" style="aspect-ratio: 1 / 1;">
               <div class="grid grid-cols-2 grid-rows-2 w-full h-full">
                 <div
                   v-for="(photo, index) in getAlbumTilePhotos(item.id)"

@@ -1,7 +1,7 @@
 <template>
   <div class="flex items-center justify-center">
-    <div class="p-8 rounded-lg bg-gray-50">
-      <h1 class="text-3xl font-bold mb-6 text-center">{{ isSignIn ? 'Sign In' : 'Sign Up' }}</h1>
+    <div class="p-8 rounded-lg bg-gray-50 dark:bg-slate-900/60 border border-transparent dark:border-slate-700/60">
+      <h1 class="text-3xl font-bold mb-6 text-center text-gray-900 dark:text-slate-100">{{ isSignIn ? 'Sign In' : 'Sign Up' }}</h1>
       <form @submit.prevent="isSignIn ? signIn() : signUp()">
 
         <div v-if="isEnableGoogleAuth">
@@ -30,12 +30,12 @@
         </div>
 
         <div class="mb-4">
-          <label for="email" class="block text-gray-500 text-sm font-bold mb-2">Email:</label>
-          <input type="email" v-model="email" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-500 leading-tight focus:outline-none focus:shadow-outline" />
+          <label for="email" class="block text-gray-500 dark:text-slate-300 text-sm font-bold mb-2">Email:</label>
+          <input type="email" v-model="email" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-950/40 border-gray-200 dark:border-slate-700/60 leading-tight focus:outline-none focus:shadow-outline" />
         </div>
         <div class="">
-          <label for="password" class="block text-gray-500 text-sm font-bold mb-2">Password:</label>
-          <input type="password" v-model="password" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-500 mb-3 leading-tight focus:outline-none focus:shadow-outline" />
+          <label for="password" class="block text-gray-500 dark:text-slate-300 text-sm font-bold mb-2">Password:</label>
+          <input type="password" v-model="password" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-900 dark:text-slate-100 bg-white dark:bg-slate-950/40 border-gray-200 dark:border-slate-700/60 mb-3 leading-tight focus:outline-none focus:shadow-outline" />
         </div>
         <p v-if="isSignIn" class="cursor-pointer font-bold text-primary" @click="reset">Forgot Password?</p>
         <div class="mt-6 text-center">
@@ -45,9 +45,9 @@
           </div>
         </div>
       </form>
-      <p class="mt-4 text-gray-600 text-center">
+      <p class="mt-4 text-gray-600 dark:text-slate-300 text-center">
         {{ isSignIn ? "Don't have an account?" : "Already have an account?" }}
-        <a @click="toggleAuthMode" class="text-purple-500 hover:text-purple-700 cursor-pointer">{{ isSignIn ? 'Sign Up' : 'Sign In' }}</a>
+        <a @click="toggleAuthMode" class="text-purple-500 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 cursor-pointer">{{ isSignIn ? 'Sign Up' : 'Sign In' }}</a>
       </p>
     </div>
   </div>
