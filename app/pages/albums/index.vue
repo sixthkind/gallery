@@ -285,7 +285,7 @@ watch(() => route.fullPath, () => {
 <template>
   <ion-page>
     <ion-content>
-      <CommonContainer>
+      <CommonContainer class="pb-24">
         <div class="flex items-center justify-between mt-4 mb-6">
           <h1 class="text-2xl font-bold text-gray-800">Albums</h1>
           <button

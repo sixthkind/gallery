@@ -31,7 +31,7 @@
               <!-- Upload Icon -->
               <button
                 @click="galleryState.toggleUpload()"
-                class="bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
+                class="bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border h-10 w-10 inline-flex items-center justify-center leading-none hover:bg-opacity-90 transition-colors ring-1 ring-slate-300/40 dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60 dark:ring-slate-600/35"
                 :title="galleryState.showUpload.value ? 'Hide upload' : 'Show upload'"
               >
                 <Icon 
@@ -46,7 +46,7 @@
               <!-- Selection Mode Toggle Icon -->
               <button
                 @click="galleryState.toggleSelection()"
-                class="bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
+                class="bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border h-10 w-10 inline-flex items-center justify-center leading-none hover:bg-opacity-90 transition-colors ring-1 ring-slate-300/40 dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60 dark:ring-slate-600/35"
                 :title="galleryState.selectionMode.value ? 'Exit selection mode' : 'Enter selection mode'"
               >
                 <Icon 
