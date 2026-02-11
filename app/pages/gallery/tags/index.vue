@@ -1,11 +1,14 @@
 <script setup>
 import { pb } from '#imports';
+import { GALLERY_COLLECTIONS } from '~/utils/collections';
 import { ref, onMounted, watch, computed } from 'vue';
 
 const colorMode = useColorMode();
 import { useRoute, useRouter } from 'vue-router';
 
-definePageMeta({});
+definePageMeta({
+  middleware: ["auth", "gallery-module"]
+});
 
 const router = useRouter();
 const route = useRoute();
@@ -52,8 +55,8 @@ const fetchTags = async () => {
   loading.value = true;
   try {
     const [tagRecords, photoRecords] = await Promise.all([
-      pb.collection('tags').getFullList({ sort: 'name' }),
-      pb.collection('photos').getFullList({ fields: 'id,tags' })
+      pb.collection(GALLERY_COLLECTIONS.tags).getFullList({ sort: 'name' }),
+      pb.collection(GALLERY_COLLECTIONS.photos).getFullList({ fields: 'id,tags' })
     ]);
 
     const counts = new Map();
@@ -77,7 +80,7 @@ const fetchTags = async () => {
 
 const openTag = (tag) => {
   if (!tag?.name) return;
-  router.push(`/tags/${encodeURIComponent(tag.name)}`);
+  router.push(`/gallery/tags/${encodeURIComponent(tag.name)}`);
 };
 
 onMounted(() => {

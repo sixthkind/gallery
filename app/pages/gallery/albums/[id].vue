@@ -1,10 +1,13 @@
 <script setup>
 import { pb } from '#imports';
+import { GALLERY_COLLECTIONS } from '~/utils/collections';
 import { alertController } from '@ionic/vue';
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-definePageMeta({});
+definePageMeta({
+  middleware: ["auth", "gallery-module"]
+});
 
 const route = useRoute();
 const router = useRouter();
@@ -28,7 +31,7 @@ const fetchAlbum = async () => {
   }
   loading.value = true;
   try {
-    album.value = await pb.collection('albums').getOne(albumId.value);
+    album.value = await pb.collection(GALLERY_COLLECTIONS.albums).getOne(albumId.value);
     pendingTitle.value = album.value?.title || '';
   } catch (error) {
     console.error('Error fetching album:', error);
@@ -52,7 +55,7 @@ const queueTitleSave = () => {
     const newTitle = pendingTitle.value.trim();
     if (!newTitle || newTitle === album.value.title) return;
     try {
-      album.value = await pb.collection('albums').update(album.value.id, {
+      album.value = await pb.collection(GALLERY_COLLECTIONS.albums).update(album.value.id, {
         title: newTitle
       });
     } catch (error) {
@@ -71,7 +74,7 @@ const goBack = () => {
     router.back();
     return;
   }
-  router.push('/albums');
+  router.push('/gallery/albums');
 };
 
 const refreshGallery = () => {
@@ -125,16 +128,16 @@ const deleteAlbum = async () => {
           isDeleting.value = true;
           try {
             const albumFilter = `album = "${albumId.value}"`;
-            const groupsToDelete = await pb.collection('groups').getFullList({ filter: albumFilter });
+            const groupsToDelete = await pb.collection(GALLERY_COLLECTIONS.groups).getFullList({ filter: albumFilter });
             for (const group of groupsToDelete) {
-              await pb.collection('groups').delete(group.id);
+              await pb.collection(GALLERY_COLLECTIONS.groups).delete(group.id);
             }
-            const photosToDelete = await pb.collection('photos').getFullList({ filter: albumFilter });
+            const photosToDelete = await pb.collection(GALLERY_COLLECTIONS.photos).getFullList({ filter: albumFilter });
             for (const photo of photosToDelete) {
-              await pb.collection('photos').delete(photo.id);
+              await pb.collection(GALLERY_COLLECTIONS.photos).delete(photo.id);
             }
-            await pb.collection('albums').delete(albumId.value);
-            router.push({ path: '/albums', query: { refreshed: Date.now().toString() } });
+            await pb.collection(GALLERY_COLLECTIONS.albums).delete(albumId.value);
+            router.push({ path: '/gallery/albums', query: { refreshed: Date.now().toString() } });
           } catch (error) {
             console.error('Error deleting album:', error);
           } finally {

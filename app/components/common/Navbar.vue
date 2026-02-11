@@ -71,7 +71,8 @@
               </button> -->
             </div>
             <a
-              href="/albums"
+              v-if="galleryInstalled"
+              href="/gallery/albums"
               class="hidden md:inline-flex items-center gap-2 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border px-3 py-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
               title="Albums"
             >
@@ -79,7 +80,8 @@
               <span class="font-bold text-slate-500 dark:text-slate-300">Albums</span>
             </a>
             <a
-              href="/tags"
+              v-if="galleryInstalled"
+              href="/gallery/tags"
               class="hidden md:inline-flex items-center gap-2 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border px-3 py-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
               title="Tags"
             >
@@ -167,6 +169,17 @@
   const emailDomain = computed(() => email.value.split('@')[1]);
 
   const open = ref(false);
+  const { refreshModules, isInstalled } = useModules();
+  const galleryInstalled = computed(() => isInstalled("gallery"));
+
+  watch(() => pb.authStore.isValid, async (isValid) => {
+    if (!isValid) return;
+    try {
+      await refreshModules(true);
+    } catch (error) {
+      // Keep navbar usable if module fetch fails.
+    }
+  }, { immediate: true });
 
   const menuitems = computed(() => {
     const items = [
@@ -175,16 +188,20 @@
         path: "/",
         icon: "heroicons:home",
       },
-      {
-        title: "Albums",
-        path: "/albums",
-        icon: "heroicons:rectangle-stack",
-      },
-      {
-        title: "Tags",
-        path: "/tags",
-        icon: "heroicons:tag",
-      }
+      ...(galleryInstalled.value
+        ? [
+            {
+              title: "Albums",
+              path: "/gallery/albums",
+              icon: "heroicons:rectangle-stack",
+            },
+            {
+              title: "Tags",
+              path: "/gallery/tags",
+              icon: "heroicons:tag",
+            }
+          ]
+        : [])
     ];
 
     if (pb.authStore.isValid) {
@@ -199,7 +216,7 @@
   });
 
   // Use shared gallery state composable (only on gallery page)
-  const isGalleryPage = computed(() => route.path === '/' || route.path === '/albums' || route.path.startsWith('/albums/'));
+  const isGalleryPage = computed(() => route.path === '/gallery' || route.path.startsWith('/gallery/'));
   const galleryState = useGalleryState();
 
   // Get layout icon based on current layout

@@ -86,11 +86,10 @@
   }
 
   const tags = () => {
-    window.location.href = `/tags`;
+    window.location.href = `/gallery/tags`;
   }
 
   const clients = () => {
     window.location.href = `/clients`;
   }
 </script>
-

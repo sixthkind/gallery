@@ -167,6 +167,7 @@
 
 <script setup>
 import { pb } from '#imports';
+import { GALLERY_COLLECTIONS } from '~/utils/collections';
 import { ref, computed } from 'vue';
 import exifr from 'exifr';
 
@@ -295,7 +296,7 @@ const uploadPhotos = async () => {
 
   if (props.albumId) {
     try {
-      const album = await pb.collection('albums').getOne(props.albumId);
+      const album = await pb.collection(GALLERY_COLLECTIONS.albums).getOne(props.albumId);
       if (!album.coverPhoto) {
         shouldSetCover = true;
       } else {
@@ -355,10 +356,10 @@ const uploadPhotos = async () => {
         }
       }, 100);
       
-      const createdPhoto = await pb.collection('photos').create(formData);
+      const createdPhoto = await pb.collection(GALLERY_COLLECTIONS.photos).create(formData);
       if (props.albumId && shouldSetCover && !albumCoverId) {
         try {
-          await pb.collection('albums').update(props.albumId, { coverPhoto: createdPhoto.id });
+          await pb.collection(GALLERY_COLLECTIONS.albums).update(props.albumId, { coverPhoto: createdPhoto.id });
           albumCoverId = createdPhoto.id;
           shouldSetCover = false;
         } catch (error) {

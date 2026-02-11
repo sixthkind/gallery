@@ -138,6 +138,7 @@
 
 <script setup>
 import { pb } from '#imports';
+import { GALLERY_COLLECTIONS } from '~/utils/collections';
 import { ref, reactive, watch } from 'vue';
 
 const props = defineProps({
@@ -236,7 +237,7 @@ const handleSubmit = async () => {
       groupData.album = props.albumId;
     }
 
-    const group = await pb.collection('groups').create(groupData);
+    const group = await pb.collection(GALLERY_COLLECTIONS.groups).create(groupData);
 
     // Update all photos to link them to the group
     for (const photoId of photoIds) {
@@ -244,7 +245,7 @@ const handleSubmit = async () => {
       if (props.albumId) {
         updateData.album = props.albumId;
       }
-      await pb.collection('photos').update(photoId, updateData);
+      await pb.collection(GALLERY_COLLECTIONS.photos).update(photoId, updateData);
     }
 
     // Emit success event

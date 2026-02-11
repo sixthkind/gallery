@@ -1,10 +1,13 @@
 <script setup>
 import { pb } from '#imports';
+import { GALLERY_COLLECTIONS } from '~/utils/collections';
 import { alertController } from '@ionic/vue';
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-definePageMeta({});
+definePageMeta({
+  middleware: ["auth", "gallery-module"]
+});
 
 const route = useRoute();
 const router = useRouter();
@@ -29,10 +32,10 @@ const fetchTag = async () => {
   }
   loading.value = true;
   try {
-    tagRecord.value = await pb.collection('tags').getFirstListItem(`name = "${String(tagName.value).replace(/"/g, '\\"')}"`);
+    tagRecord.value = await pb.collection(GALLERY_COLLECTIONS.tags).getFirstListItem(`name = "${String(tagName.value).replace(/"/g, '\\"')}"`);
     const tagId = tagRecord.value.id;
     pendingTagName.value = tagRecord.value?.name || '';
-    const allTagged = await pb.collection('photos').getFullList({
+    const allTagged = await pb.collection(GALLERY_COLLECTIONS.photos).getFullList({
       sort: '-dateTaken,-created',
       expand: 'tags'
     });
@@ -53,7 +56,7 @@ const fetchTag = async () => {
 
 const fetchTagsList = async () => {
   try {
-    tags.value = await pb.collection('tags').getFullList({
+    tags.value = await pb.collection(GALLERY_COLLECTIONS.tags).getFullList({
       sort: 'name'
     });
   } catch (error) {
@@ -102,7 +105,7 @@ const queueTagSave = () => {
     const newName = pendingTagName.value.trim();
     if (!newName || newName === tagRecord.value.name) return;
     try {
-      tagRecord.value = await pb.collection('tags').update(tagRecord.value.id, {
+      tagRecord.value = await pb.collection(GALLERY_COLLECTIONS.tags).update(tagRecord.value.id, {
         name: newName
       });
       tags.value = tags.value
@@ -112,7 +115,7 @@ const queueTagSave = () => {
         })
         .sort((a, b) => a.name.localeCompare(b.name));
       if (newName !== tagName.value) {
-        window.history.replaceState({}, '', `/tags/${encodeURIComponent(newName)}`);
+        window.history.replaceState({}, '', `/gallery/tags/${encodeURIComponent(newName)}`);
       }
     } catch (error) {
       console.error('Error updating tag name:', error);
@@ -130,7 +133,7 @@ const goBack = () => {
     router.back();
     return;
   }
-  router.push('/tags');
+  router.push('/gallery/tags');
 };
 
 const deleteTag = async () => {
@@ -150,8 +153,8 @@ const deleteTag = async () => {
         handler: async () => {
           isDeletingTag.value = true;
           try {
-            await pb.collection('tags').delete(tagRecord.value.id);
-            router.push({ path: '/tags', query: { refreshed: Date.now().toString() } });
+            await pb.collection(GALLERY_COLLECTIONS.tags).delete(tagRecord.value.id);
+            router.push({ path: '/gallery/tags', query: { refreshed: Date.now().toString() } });
           } catch (error) {
             console.error('Error deleting tag:', error);
           } finally {
@@ -263,7 +266,7 @@ watch(pendingTagName, () => {
             <button
               v-if="nextTag"
               class="flex items-center gap-2 text-gray-300 hover:text-gray-700 transition-colors"
-              @click="router.push(`/tags/${encodeURIComponent(nextTag.name)}`)"
+              @click="router.push(`/gallery/tags/${encodeURIComponent(nextTag.name)}`)"
               aria-label="Next tag"
             >
               <span class="text-lg font-semibold">#{{ nextTag.name }}</span>

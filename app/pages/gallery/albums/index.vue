@@ -1,9 +1,12 @@
 <script setup>
 import { pb } from '#imports';
+import { GALLERY_COLLECTIONS } from '~/utils/collections';
 import { ref, computed, onMounted, onActivated, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 
-definePageMeta({});
+definePageMeta({
+  middleware: ["auth", "gallery-module"]
+});
 
 const router = useRouter();
 const route = useRoute();
@@ -51,7 +54,7 @@ const ensureAlbumSortOrder = async (items) => {
 
   await Promise.all(updates.map(async ({ item, sortOrder }) => {
     try {
-      await pb.collection('albums').update(item.id, { sortOrder });
+      await pb.collection(GALLERY_COLLECTIONS.albums).update(item.id, { sortOrder });
       item.sortOrder = sortOrder;
     } catch (error) {
       console.error('Error updating album sort order:', error);
@@ -73,7 +76,7 @@ const normalizeAlbumSortOrder = async (items) => {
   await Promise.all(sortedItems.map(async (item, index) => {
     const sortOrder = index * step;
     try {
-      await pb.collection('albums').update(item.id, { sortOrder });
+      await pb.collection(GALLERY_COLLECTIONS.albums).update(item.id, { sortOrder });
       item.sortOrder = sortOrder;
     } catch (error) {
       console.error('Error normalizing album sort order:', error);
@@ -97,7 +100,7 @@ const orderedAlbums = computed(() => {
 const fetchAlbums = async () => {
   loading.value = true;
   try {
-    albums.value = await pb.collection('albums').getFullList({
+    albums.value = await pb.collection(GALLERY_COLLECTIONS.albums).getFullList({
       sort: '-created',
       expand: 'coverPhoto'
     });
@@ -105,7 +108,7 @@ const fetchAlbums = async () => {
     await normalizeAlbumSortOrder(albums.value);
     const albumIds = albums.value.map(album => album.id);
     if (albumIds.length > 0) {
-      const photos = await pb.collection('photos').getFullList({
+      const photos = await pb.collection(GALLERY_COLLECTIONS.photos).getFullList({
         sort: '-dateTaken,-created',
         filter: `album != ""`
       });
@@ -163,7 +166,7 @@ const getPhotoUrl = (photo) => {
 };
 
 const openAlbum = (album) => {
-  router.push(`/albums/${album.id}`);
+  router.push(`/gallery/albums/${album.id}`);
 };
 
 const setAlbumSortOrder = (albumId, sortOrder) => {
@@ -211,7 +214,7 @@ const reorderAlbums = async ({ sourceId, targetId }) => {
     // Apply renormalization to database and local state
     await Promise.all(renormalizeUpdates.map(async ({ albumId, sortOrder }) => {
       try {
-        await pb.collection('albums').update(albumId, { sortOrder });
+        await pb.collection(GALLERY_COLLECTIONS.albums).update(albumId, { sortOrder });
         setAlbumSortOrder(albumId, sortOrder);
       } catch (error) {
         console.error('Error renormalizing album sort order:', error);
@@ -234,7 +237,7 @@ const reorderAlbums = async ({ sourceId, targetId }) => {
 
   setAlbumSortOrder(sourceId, newOrder);
   try {
-    await pb.collection('albums').update(sourceId, { sortOrder: newOrder });
+    await pb.collection(GALLERY_COLLECTIONS.albums).update(sourceId, { sortOrder: newOrder });
   } catch (error) {
     console.error('Error updating album sort order:', error);
   }
@@ -258,7 +261,7 @@ const createAlbum = async () => {
     if (pb.authStore.record?.id) {
       albumData.user = pb.authStore.record.id;
     }
-    await pb.collection('albums').create(albumData);
+    await pb.collection(GALLERY_COLLECTIONS.albums).create(albumData);
     form.value.title = '';
     form.value.description = '';
     showCreate.value = false;

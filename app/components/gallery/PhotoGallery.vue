@@ -287,6 +287,7 @@
 
 <script setup>
 import { pb } from '#imports';
+import { GALLERY_COLLECTIONS } from '~/utils/collections';
 import { alertController } from '@ionic/vue';
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import exifr from 'exifr';
@@ -472,7 +473,7 @@ const ensureGroupPhotoSortOrder = async () => {
 
   await Promise.all(updates.map(async ({ groupId, photoId, sortOrder }) => {
     try {
-      await pb.collection('photos').update(photoId, { sortOrder });
+      await pb.collection(GALLERY_COLLECTIONS.photos).update(photoId, { sortOrder });
       setGroupPhotoSortOrder(groupId, photoId, sortOrder);
     } catch (error) {
       console.error('Error updating group photo sort order:', error);
@@ -488,14 +489,14 @@ const fetchPhotos = async () => {
       ? `album = "${props.albumId}"`
       : '(album = "" || album = null || favorite = true)';
     // Fetch all photos
-    const allPhotos = await pb.collection('photos').getFullList({
+    const allPhotos = await pb.collection(GALLERY_COLLECTIONS.photos).getFullList({
       sort: props.dateSortDirection === 'asc' ? 'dateTaken,created' : '-dateTaken,-created',
       expand: 'tags,group',
       filter: albumFilter
     });
     
     // Fetch groups with expanded relations
-    const allGroups = await pb.collection('groups').getFullList({
+    const allGroups = await pb.collection(GALLERY_COLLECTIONS.groups).getFullList({
       sort: '-created',
       expand: 'coverPhoto,photos,photos.tags,user',
       filter: albumFilter
@@ -825,7 +826,7 @@ const toggleFavorite = async (item) => {
   if (item.isGroup) {
     setGroupFavorite(item.id, nextFavorite);
     try {
-      await pb.collection('groups').update(item.id, { favorite: nextFavorite });
+      await pb.collection(GALLERY_COLLECTIONS.groups).update(item.id, { favorite: nextFavorite });
     } catch (error) {
       console.error('Error updating group favorite:', error);
       setGroupFavorite(item.id, currentFavorite);
@@ -835,7 +836,7 @@ const toggleFavorite = async (item) => {
 
   setPhotoFavorite(item.id, nextFavorite);
   try {
-    await pb.collection('photos').update(item.id, { favorite: nextFavorite });
+    await pb.collection(GALLERY_COLLECTIONS.photos).update(item.id, { favorite: nextFavorite });
   } catch (error) {
     console.error('Error updating photo favorite:', error);
     setPhotoFavorite(item.id, currentFavorite);
@@ -1006,7 +1007,7 @@ const reorderItems = async ({ sourceId, targetId, groupId }) => {
       // Apply renormalization to database and local state
       await Promise.all(renormalizeUpdates.map(async ({ photoId, sortOrder }) => {
         try {
-          await pb.collection('photos').update(photoId, { sortOrder });
+          await pb.collection(GALLERY_COLLECTIONS.photos).update(photoId, { sortOrder });
           setGroupPhotoSortOrder(groupId, photoId, sortOrder);
         } catch (error) {
           console.error('Error renormalizing group photo sort order:', error);
@@ -1028,7 +1029,7 @@ const reorderItems = async ({ sourceId, targetId, groupId }) => {
     }
 
     try {
-      await pb.collection('photos').update(sourceId, { sortOrder: newOrder });
+      await pb.collection(GALLERY_COLLECTIONS.photos).update(sourceId, { sortOrder: newOrder });
       // Only update local state after database update succeeds
       setGroupPhotoSortOrder(groupId, sourceId, newOrder);
     } catch (error) {
@@ -1220,7 +1221,7 @@ const replaceSelectedPhoto = async (file) => {
     appendValue('orientation', metadata?.orientation != null ? metadata.orientation.toString() : '');
     appendValue('fileSize', metadata?.fileSize != null ? metadata.fileSize.toString() : '');
 
-    await pb.collection('photos').update(target.id, formData);
+    await pb.collection(GALLERY_COLLECTIONS.photos).update(target.id, formData);
     refresh();
   } catch (error) {
     console.error('Error replacing photo:', error);
@@ -1256,14 +1257,14 @@ const createQuickGroup = async () => {
       groupData.album = props.albumId;
     }
 
-    const group = await pb.collection('groups').create(groupData);
+    const group = await pb.collection(GALLERY_COLLECTIONS.groups).create(groupData);
 
     for (const photoId of photoIds) {
       const updateData = { group: group.id };
       if (props.albumId) {
         updateData.album = props.albumId;
       }
-      await pb.collection('photos').update(photoId, updateData);
+      await pb.collection(GALLERY_COLLECTIONS.photos).update(photoId, updateData);
     }
 
     clearSelectionState();
@@ -1399,33 +1400,33 @@ const deletePhoto = async (photo) => {
     // If photo is in a group, remove it from the group first
     if (photo.group) {
       groupToCheck = photo.group;
-      const group = await pb.collection('groups').getOne(photo.group);
+      const group = await pb.collection(GALLERY_COLLECTIONS.groups).getOne(photo.group);
       const updatedPhotos = group.photos.filter(id => id !== photo.id);
       
       // Update group photos
-      await pb.collection('groups').update(group.id, {
+      await pb.collection(GALLERY_COLLECTIONS.groups).update(group.id, {
         photos: updatedPhotos
       });
       
       // If this was the cover photo, set a new one or clear it
       if (group.coverPhoto === photo.id) {
         const newCoverPhoto = updatedPhotos.length > 0 ? updatedPhotos[0] : '';
-        await pb.collection('groups').update(group.id, {
+        await pb.collection(GALLERY_COLLECTIONS.groups).update(group.id, {
           coverPhoto: newCoverPhoto
         });
       }
     }
     
-    await pb.collection('photos').delete(photo.id);
+    await pb.collection(GALLERY_COLLECTIONS.photos).delete(photo.id);
     photos.value = photos.value.filter(p => p.id !== photo.id);
     
     // Check if the group has 0 or 1 photos left and handle accordingly
     if (groupToCheck) {
       try {
-        const group = await pb.collection('groups').getOne(groupToCheck);
+        const group = await pb.collection(GALLERY_COLLECTIONS.groups).getOne(groupToCheck);
         if (!group.photos || group.photos.length === 0) {
           // Delete empty group
-          await pb.collection('groups').delete(groupToCheck);
+          await pb.collection(GALLERY_COLLECTIONS.groups).delete(groupToCheck);
           console.log(`Automatically deleted empty group: ${groupToCheck}`);
         } else if (group.photos.length === 1) {
           // Only one photo left - convert to standalone photo
@@ -1433,13 +1434,13 @@ const deletePhoto = async (photo) => {
           const groupSortOrder = group.sortOrder;
           
           // Remove group reference from the photo and set its sortOrder to group's sortOrder
-          await pb.collection('photos').update(lastPhotoId, { 
+          await pb.collection(GALLERY_COLLECTIONS.photos).update(lastPhotoId, { 
             group: '',
             sortOrder: groupSortOrder
           });
           
           // Delete the group
-          await pb.collection('groups').delete(groupToCheck);
+          await pb.collection(GALLERY_COLLECTIONS.groups).delete(groupToCheck);
           console.log(`Automatically deleted single-photo group: ${groupToCheck}, photo ${lastPhotoId} is now standalone`);
         }
       } catch (error) {
@@ -1520,7 +1521,7 @@ const updateSelectedLocations = async (location) => {
   const photoIds = [...new Set(selectedPhotos.value)];
   try {
     await Promise.all(photoIds.map(photoId => {
-      return pb.collection('photos').update(photoId, { location });
+      return pb.collection(GALLERY_COLLECTIONS.photos).update(photoId, { location });
     }));
 
     photos.value = photos.value.map(photo =>
@@ -1558,34 +1559,34 @@ const deleteSelectedPhotos = async () => {
       // If photo is in a group, remove it from the group first
       if (photo.group) {
         groupsToCheck.add(photo.group); // Track this group
-        const group = await pb.collection('groups').getOne(photo.group);
+        const group = await pb.collection(GALLERY_COLLECTIONS.groups).getOne(photo.group);
         const updatedPhotos = group.photos.filter(id => id !== photo.id);
         
         // Update group photos
-        await pb.collection('groups').update(group.id, {
+        await pb.collection(GALLERY_COLLECTIONS.groups).update(group.id, {
           photos: updatedPhotos
         });
         
         // If this was the cover photo, set a new one or clear it
         if (group.coverPhoto === photo.id) {
           const newCoverPhoto = updatedPhotos.length > 0 ? updatedPhotos[0] : '';
-          await pb.collection('groups').update(group.id, {
+          await pb.collection(GALLERY_COLLECTIONS.groups).update(group.id, {
             coverPhoto: newCoverPhoto
           });
         }
       }
       
       // Delete the photo
-      await pb.collection('photos').delete(photo.id);
+      await pb.collection(GALLERY_COLLECTIONS.photos).delete(photo.id);
     }
     
     // Check if any groups have 0 or 1 photos left and handle accordingly
     for (const groupId of groupsToCheck) {
       try {
-        const group = await pb.collection('groups').getOne(groupId);
+        const group = await pb.collection(GALLERY_COLLECTIONS.groups).getOne(groupId);
         if (!group.photos || group.photos.length === 0) {
           // Delete empty group
-          await pb.collection('groups').delete(groupId);
+          await pb.collection(GALLERY_COLLECTIONS.groups).delete(groupId);
           console.log(`Automatically deleted empty group: ${groupId}`);
         } else if (group.photos.length === 1) {
           // Only one photo left - convert to standalone photo
@@ -1593,13 +1594,13 @@ const deleteSelectedPhotos = async () => {
           const groupSortOrder = group.sortOrder;
           
           // Remove group reference from the photo and set its sortOrder to group's sortOrder
-          await pb.collection('photos').update(lastPhotoId, { 
+          await pb.collection(GALLERY_COLLECTIONS.photos).update(lastPhotoId, { 
             group: '',
             sortOrder: groupSortOrder
           });
           
           // Delete the group
-          await pb.collection('groups').delete(groupId);
+          await pb.collection(GALLERY_COLLECTIONS.groups).delete(groupId);
           console.log(`Automatically deleted single-photo group: ${groupId}, photo ${lastPhotoId} is now standalone`);
         }
       } catch (error) {
@@ -1637,13 +1638,13 @@ const addPhotosToGroup = async () => {
 
   try {
     const groupId = currentExpandedGroupId.value;
-    const group = await pb.collection('groups').getOne(groupId);
+    const group = await pb.collection(GALLERY_COLLECTIONS.groups).getOne(groupId);
     
     // Add all selected photos to the group (combine existing and new)
     const updatedPhotos = [...new Set([...group.photos, ...selectedPhotos.value])];
     
     // Update group photos
-    await pb.collection('groups').update(groupId, {
+    await pb.collection(GALLERY_COLLECTIONS.groups).update(groupId, {
       photos: updatedPhotos
     });
     
@@ -1653,7 +1654,7 @@ const addPhotosToGroup = async () => {
       if (group.album) {
         updateData.album = group.album;
       }
-      await pb.collection('photos').update(photoId, updateData);
+      await pb.collection(GALLERY_COLLECTIONS.photos).update(photoId, updateData);
     }
     
     // Clear selection and exit selection mode
@@ -1675,7 +1676,7 @@ const removePhotosFromGroup = async () => {
 
   try {
     const groupId = currentExpandedGroupId.value;
-    const group = await pb.collection('groups').getOne(groupId);
+    const group = await pb.collection(GALLERY_COLLECTIONS.groups).getOne(groupId);
     
     // Filter out the selected photos from the group
     const updatedPhotos = group.photos.filter(id => !selectedPhotos.value.includes(id));
@@ -1683,7 +1684,7 @@ const removePhotosFromGroup = async () => {
     // Check if the group will have 0 or 1 photos left after removal
     if (updatedPhotos.length === 0) {
       // Group will be empty - delete it
-      await pb.collection('groups').delete(groupId);
+      await pb.collection(GALLERY_COLLECTIONS.groups).delete(groupId);
       console.log(`Automatically deleted empty group: ${groupId}`);
       
       // Update removed photos to be standalone and positioned near the group
@@ -1694,7 +1695,7 @@ const removePhotosFromGroup = async () => {
         const photoId = selectedPhotos.value[i];
         const newSortOrder = groupSortOrder + sortOrderStep * (i + 1);
         
-        await pb.collection('photos').update(photoId, {
+        await pb.collection(GALLERY_COLLECTIONS.photos).update(photoId, {
           group: '',
           sortOrder: newSortOrder
         });
@@ -1705,13 +1706,13 @@ const removePhotosFromGroup = async () => {
       const groupSortOrder = typeof group.sortOrder === 'number' ? group.sortOrder : 0;
       
       // Update the last remaining photo to be standalone at the group's position
-      await pb.collection('photos').update(lastPhotoId, { 
+      await pb.collection(GALLERY_COLLECTIONS.photos).update(lastPhotoId, { 
         group: '',
         sortOrder: groupSortOrder
       });
       
       // Delete the group
-      await pb.collection('groups').delete(groupId);
+      await pb.collection(GALLERY_COLLECTIONS.groups).delete(groupId);
       console.log(`Automatically deleted single-photo group: ${groupId}, photo ${lastPhotoId} is now standalone`);
       
       // Update removed photos to appear right after
@@ -1720,7 +1721,7 @@ const removePhotosFromGroup = async () => {
         const photoId = selectedPhotos.value[i];
         const newSortOrder = groupSortOrder + sortOrderStep * (i + 1);
         
-        await pb.collection('photos').update(photoId, {
+        await pb.collection(GALLERY_COLLECTIONS.photos).update(photoId, {
           group: '',
           sortOrder: newSortOrder
         });
@@ -1728,14 +1729,14 @@ const removePhotosFromGroup = async () => {
     } else {
       // Group still has 2+ photos - proceed normally
       // Update group photos
-      await pb.collection('groups').update(groupId, {
+      await pb.collection(GALLERY_COLLECTIONS.groups).update(groupId, {
         photos: updatedPhotos
       });
       
       // If the cover photo was removed, set a new one
       if (selectedPhotos.value.includes(group.coverPhoto)) {
         const newCoverPhoto = updatedPhotos[0];
-        await pb.collection('groups').update(groupId, {
+        await pb.collection(GALLERY_COLLECTIONS.groups).update(groupId, {
           coverPhoto: newCoverPhoto
         });
       }
@@ -1748,7 +1749,7 @@ const removePhotosFromGroup = async () => {
         const photoId = selectedPhotos.value[i];
         const newSortOrder = groupSortOrder + sortOrderStep * (i + 1);
         
-        await pb.collection('photos').update(photoId, {
+        await pb.collection(GALLERY_COLLECTIONS.photos).update(photoId, {
           group: '',
           sortOrder: newSortOrder
         });
@@ -1797,19 +1798,19 @@ const deleteGroup = async () => {
   
   try {
     const groupId = currentExpandedGroupId.value;
-    const group = await pb.collection('groups').getOne(groupId);
+    const group = await pb.collection(GALLERY_COLLECTIONS.groups).getOne(groupId);
     
     // Remove group reference from all photos in the group
     if (group.photos && group.photos.length > 0) {
       for (const photoId of group.photos) {
-        await pb.collection('photos').update(photoId, {
+        await pb.collection(GALLERY_COLLECTIONS.photos).update(photoId, {
           group: ''
         });
       }
     }
     
     // Delete the group
-    await pb.collection('groups').delete(groupId);
+    await pb.collection(GALLERY_COLLECTIONS.groups).delete(groupId);
     
     // Clear selection and exit selection mode
     clearSelectionState();

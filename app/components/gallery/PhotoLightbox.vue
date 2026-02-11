@@ -225,6 +225,7 @@
 
 <script setup>
 import { pb } from '#imports';
+import { GALLERY_COLLECTIONS } from '~/utils/collections';
 import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -351,7 +352,7 @@ const queueTitleSave = () => {
     const newTitle = pendingTitle.value.trim();
     if (newTitle === localTitle.value) return;
     try {
-      const updated = await pb.collection('photos').update(photoId, {
+      const updated = await pb.collection(GALLERY_COLLECTIONS.photos).update(photoId, {
         title: newTitle
       });
       localTitle.value = updated?.title ?? newTitle;
@@ -369,7 +370,7 @@ const queueLocationSave = () => {
     const newLocation = pendingLocation.value.trim();
     if (newLocation === localLocation.value) return;
     try {
-      const updated = await pb.collection('photos').update(photoId, {
+      const updated = await pb.collection(GALLERY_COLLECTIONS.photos).update(photoId, {
         location: newLocation
       });
       localLocation.value = updated?.location ?? newLocation;
@@ -411,7 +412,7 @@ const onMetadataToggle = (event) => {
 const loadPhotoDetails = async () => {
   if (!props.photo?.id) return;
   try {
-    const record = await pb.collection('photos').getOne(props.photo.id, { expand: 'tags' });
+    const record = await pb.collection(GALLERY_COLLECTIONS.photos).getOne(props.photo.id, { expand: 'tags' });
     tags.value = record.expand?.tags || [];
     if (!isEditingTitle.value) {
       localTitle.value = record.title || '';
@@ -435,9 +436,9 @@ const addTag = async () => {
   try {
     let tagRecord;
     try {
-      tagRecord = await pb.collection('tags').getFirstListItem(`name = "${safeName}"`);
+      tagRecord = await pb.collection(GALLERY_COLLECTIONS.tags).getFirstListItem(`name = "${safeName}"`);
     } catch (error) {
-      tagRecord = await pb.collection('tags').create({
+      tagRecord = await pb.collection(GALLERY_COLLECTIONS.tags).create({
         name,
         user: pb.authStore.record?.id
       });
@@ -445,7 +446,7 @@ const addTag = async () => {
 
     if (!tags.value.some(tag => tag.id === tagRecord.id)) {
       const updatedTags = [...tags.value, tagRecord];
-      await pb.collection('photos').update(props.photo.id, {
+      await pb.collection(GALLERY_COLLECTIONS.photos).update(props.photo.id, {
         tags: updatedTags.map(tag => tag.id)
       });
       tags.value = updatedTags;
@@ -461,7 +462,7 @@ const removeTag = async (tag) => {
   if (!isAuthenticated.value) return;
   try {
     const updatedTags = tags.value.filter(existing => existing.id !== tag.id);
-    await pb.collection('photos').update(props.photo.id, {
+    await pb.collection(GALLERY_COLLECTIONS.photos).update(props.photo.id, {
       tags: updatedTags.map(existing => existing.id)
     });
     tags.value = updatedTags;
@@ -474,7 +475,7 @@ const removeTag = async (tag) => {
 const openTag = (tag) => {
   if (!tag?.name) return;
   close();
-  router.push(`/tags/${encodeURIComponent(tag.name)}`);
+  router.push(`/gallery/tags/${encodeURIComponent(tag.name)}`);
 };
 
 const loadFullSize = () => {
