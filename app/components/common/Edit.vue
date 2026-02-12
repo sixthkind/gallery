@@ -70,6 +70,7 @@
   import { useRoute } from 'vue-router';
   const route = useRoute();
   const { toLearnPath } = useLearnRoutes();
+  const { toMerchPath } = useMerchRoutes();
   const isLoaded = ref(false);
   const isSuccess = ref(false);
   const isConfirm = ref(false);
@@ -147,6 +148,13 @@
       window.location.href = toLearnPath('/admin/modules');
     } else if (type === 'subscription_tiers') {
       window.location.href = toLearnPath('/admin/subscription-tiers');
+    } else if (type === 'products') {
+      const slug = String(data.value?.slug || '').trim();
+      if (slug) {
+        window.location.href = toMerchPath(`/products/${encodeURIComponent(slug)}`);
+      } else {
+        window.location.href = toMerchPath('/products');
+      }
     } else {
       window.location.href = `/${type}`;
     }

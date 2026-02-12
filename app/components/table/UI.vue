@@ -23,7 +23,7 @@
         <div class="flex items-center gap-2">
           <USelectMenu v-model="selectedColumns" :options="columns" multiple placeholder="Columns" class="w-full sm:w-auto"/>
           <UButton @click="refresh" color="primary" size="sm"><Icon name="lucide:refresh-cw" /></UButton>
-          <UButton @click="add" color="primary" size="sm"><Icon name="lucide:plus" /></UButton>
+          <UButton v-if="canCreate" @click="add" color="primary" size="sm"><Icon name="lucide:plus" /></UButton>
         </div>
       </div>
     </div>
@@ -40,6 +40,7 @@
 
 <script setup lang="ts">
   import { tableColumns, tableComputed } from '#imports';
+  import { authUtils } from '~/utils/auth';
 
   const props = defineProps(['rows', 'type', 'loading', 'clickable', 'edit']);
   const emit = defineEmits(['refresh']);
@@ -47,6 +48,12 @@
   const clickable = props.clickable || false;
   const { toLearnPath } = useLearnRoutes();
   const { toGalleryPath } = useGalleryRoutes();
+  const { toMerchPath } = useMerchRoutes();
+  const isSuperuser = computed(() => authUtils.isSuperuser());
+  const canCreate = computed(() => {
+    if (props.type !== 'products') return true;
+    return isSuperuser.value;
+  });
 
   const learnTypes = ['courses', 'sections', 'lessons', 'modules', 'subscription_tiers'];
   const legacyTypes = ['items', 'tags', 'clients'];
@@ -78,6 +85,12 @@
   const handleRowClick = (row: any) => {
     if (!clickable) return;
 
+    if (props.type === 'products' && !isSuperuser.value) {
+      if (!row?.slug) return;
+      window.location.href = toMerchPath(`/products/${encodeURIComponent(String(row.slug))}`);
+      return;
+    }
+
     if (props.edit) {
       window.location.href = `/edit/${props.type}/${row.id}`;
       return;
@@ -91,6 +104,7 @@
   };
 
   const add = () => {
+    if (!canCreate.value) return;
     window.location.href = `/edit/${props.type}`;
   };
 

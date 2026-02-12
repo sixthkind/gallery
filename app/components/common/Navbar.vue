@@ -30,30 +30,30 @@
             <div v-if="showGalleryActions" class="flex items-center gap-2">
               <!-- Upload Icon -->
               <button
-                @click="galleryState.toggleUpload()"
+                @click="mediaState?.toggleUpload()"
                 class="bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
-                :title="galleryState.showUpload.value ? 'Hide upload' : 'Show upload'"
+                :title="mediaState?.showUpload.value ? 'Hide upload' : 'Show upload'"
               >
                 <Icon 
                   name="heroicons:cloud-arrow-up" 
                   :class="[
                     'w-5 h-5 transition-colors',
-                    galleryState.showUpload.value ? 'text-primary' : 'text-gray-400 dark:text-slate-400'
+                    mediaState?.showUpload.value ? 'text-primary' : 'text-gray-400 dark:text-slate-400'
                   ]"
                 />
               </button>
               
               <!-- Selection Mode Toggle Icon -->
               <button
-                @click="galleryState.toggleSelection()"
+                @click="mediaState?.toggleSelection()"
                 class="bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
-                :title="galleryState.selectionMode.value ? 'Exit selection mode' : 'Enter selection mode'"
+                :title="mediaState?.selectionMode.value ? 'Exit selection mode' : 'Enter selection mode'"
               >
                 <Icon 
                   name="heroicons:cursor-arrow-rays" 
                   :class="[
                     'w-5 h-5 transition-colors',
-                    galleryState.selectionMode.value ? 'text-primary' : 'text-gray-400 dark:text-slate-400'
+                    mediaState?.selectionMode.value ? 'text-primary' : 'text-gray-400 dark:text-slate-400'
                   ]"
                 />
               </button>
@@ -177,6 +177,10 @@
   const galleryModule = computed(() => modules.value.find((module) => module.slug === "gallery"));
   const galleryMain = computed(() => !!galleryModule.value?.isMain);
 
+  const merchInstalled = computed(() => isInstalled("merch"));
+  const merchModule = computed(() => modules.value.find((module) => module.slug === "merch"));
+  const merchMain = computed(() => !!merchModule.value?.isMain);
+
   const learnInstalled = computed(() => isInstalled("learn"));
   const learnModule = computed(() => modules.value.find((module) => module.slug === "learn"));
   const learnMain = computed(() => !!learnModule.value?.isMain);
@@ -188,6 +192,18 @@
       path.startsWith("/albums/") ||
       path === "/tags" ||
       path.startsWith("/tags/")
+    );
+  };
+
+  const isRootMerchRoute = (path) => {
+    return (
+      path === "/" ||
+      path === "/albums" ||
+      path.startsWith("/albums/") ||
+      path === "/tags" ||
+      path.startsWith("/tags/") ||
+      path === "/products" ||
+      path.startsWith("/products/")
     );
   };
 
@@ -237,13 +253,16 @@
 
     if (path === "/") {
       if (learnMain.value && learnInstalled.value) return "learn";
+      if (merchMain.value && merchInstalled.value) return "merch";
       if (galleryMain.value && galleryInstalled.value) return "gallery";
       return null;
     }
 
     if (path === "/learn" || path.startsWith("/learn/")) return "learn";
     if (path === "/gallery" || path.startsWith("/gallery/")) return "gallery";
+    if (path === "/merch" || path.startsWith("/merch/")) return "merch";
     if (isRootLearnRoute(path) || isLearnEditRoute(path)) return "learn";
+    if (isRootMerchRoute(path) && merchMain.value) return "merch";
     if (isRootGalleryRoute(path)) return "gallery";
 
     return null;
@@ -351,7 +370,7 @@
     }
   }, { immediate: true });
 
-  // Use shared gallery state composable (only when gallery is active).
+  // Use shared media state composables for gallery-like modules.
   const isGalleryPage = computed(() => {
     const path = activePath.value;
     const isNestedGallery = path === "/gallery" || path.startsWith("/gallery/");
@@ -359,9 +378,31 @@
 
     return isNestedGallery || isRootGalleryRoute(path);
   });
+
+  const isMerchPage = computed(() => {
+    const path = activePath.value;
+    const isNestedMerch = path === "/merch" || path.startsWith("/merch/");
+    if (!merchMain.value) return isNestedMerch;
+
+    return isNestedMerch || isRootMerchRoute(path);
+  });
+
   const galleryState = useGalleryState();
+  const merchState = useMerchState();
+  const mediaState = computed(() => {
+    if (activeModuleSlug.value === "merch") return merchState;
+    if (activeModuleSlug.value === "gallery") return galleryState;
+    return null;
+  });
   const showGalleryActions = computed(() => {
-    return isSuperuser.value && activeModuleSlug.value === "gallery" && isGalleryPage.value && !!galleryState;
+    if (!isSuperuser.value) return false;
+    if (activeModuleSlug.value === "gallery") {
+      return isGalleryPage.value && !!galleryState;
+    }
+    if (activeModuleSlug.value === "merch") {
+      return isMerchPage.value && !!merchState;
+    }
+    return false;
   });
 </script>
 

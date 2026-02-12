@@ -1,6 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 const MODULE_SLUG_GALLERY = "gallery";
+const MODULE_SLUG_MERCH = "merch";
 const MODULE_SLUG_LEARN = "learn";
 const COLLECTION_MODULES = "modules";
 const MODULES_COLLECTION_ID = "pbc_5550000001";
@@ -15,6 +16,16 @@ const GALLERY_TAGS = "gallery_tags";
 const GALLERY_PHOTOS = "gallery_photos";
 const GALLERY_GROUPS = "gallery_groups";
 const GALLERY_ALBUMS = "gallery_albums";
+
+const MERCH_TAGS_ID = "pbc_merch_tg001";
+const MERCH_PHOTOS_ID = "pbc_merch_ph001";
+const MERCH_PRODUCTS_ID = "pbc_merch_pr001";
+const MERCH_ALBUMS_ID = "pbc_merch_al001";
+
+const MERCH_TAGS = "merch_tags";
+const MERCH_PHOTOS = "merch_photos";
+const MERCH_PRODUCTS = "merch_products";
+const MERCH_ALBUMS = "merch_albums";
 
 const LEARN_COURSES_ID = "pbc_learn_c001";
 const LEARN_SECTIONS_ID = "pbc_learn_s001";
@@ -40,6 +51,17 @@ const DEFAULT_MODULE_CONFIGS = {
       titleText: "Gallery",
       buttons: [
         { title: "Albums", path: "/albums", icon: "heroicons:rectangle-stack" },
+        { title: "Tags", path: "/tags", icon: "heroicons:tag" }
+      ]
+    },
+    settings: {
+      titleEditable: true
+    }
+  },
+  [MODULE_SLUG_MERCH]: {
+    navbar: {
+      titleText: "Merch",
+      buttons: [
         { title: "Tags", path: "/tags", icon: "heroicons:tag" }
       ]
     },
@@ -98,8 +120,17 @@ function hasAllLearnCollections() {
   );
 }
 
+function hasAllMerchCollections() {
+  return !!(
+    findCollectionSafe(MERCH_TAGS) &&
+    findCollectionSafe(MERCH_PHOTOS) &&
+    findCollectionSafe(MERCH_PRODUCTS) &&
+    findCollectionSafe(MERCH_ALBUMS)
+  );
+}
+
 function isSupportedModuleSlug(slug) {
-  return slug === MODULE_SLUG_GALLERY || slug === MODULE_SLUG_LEARN;
+  return slug === MODULE_SLUG_GALLERY || slug === MODULE_SLUG_MERCH || slug === MODULE_SLUG_LEARN;
 }
 
 function cloneJSON(value) {
@@ -154,9 +185,15 @@ function normalizeModuleConfig(slug, rawConfig) {
   const normalizedButtons = sourceButtons
     .map(normalizeModuleButton)
     .filter((button) => !!button);
-  const buttons = normalizedButtons.length > 0
+  let buttons = normalizedButtons.length > 0
     ? normalizedButtons
     : defaults.navbar.buttons.map(normalizeModuleButton).filter((button) => !!button);
+  if (slug === MODULE_SLUG_MERCH) {
+    buttons = buttons.filter((button) => button.path === "/tags");
+    if (buttons.length === 0) {
+      buttons = defaults.navbar.buttons.map(normalizeModuleButton).filter((button) => !!button);
+    }
+  }
 
   return {
     navbar: {
@@ -533,6 +570,15 @@ function ensureModulesCollectionAndSeed() {
       config: getDefaultModuleConfig(MODULE_SLUG_GALLERY)
     },
     {
+      slug: MODULE_SLUG_MERCH,
+      name: "Merch",
+      description: "Merchandise catalog module",
+      routeBase: "/merch",
+      collectionPrefix: "merch_",
+      installed: hasAllMerchCollections(),
+      config: getDefaultModuleConfig(MODULE_SLUG_MERCH)
+    },
+    {
       slug: MODULE_SLUG_LEARN,
       name: "Learn",
       description: "E-learning courses module",
@@ -581,6 +627,14 @@ function getOrCreateModuleRecord(slug) {
       collectionPrefix: "gallery_",
       installed: hasAllGalleryCollections(),
       config: getDefaultModuleConfig(MODULE_SLUG_GALLERY)
+    },
+    [MODULE_SLUG_MERCH]: {
+      name: "Merch",
+      description: "Merchandise catalog module",
+      routeBase: "/merch",
+      collectionPrefix: "merch_",
+      installed: hasAllMerchCollections(),
+      config: getDefaultModuleConfig(MODULE_SLUG_MERCH)
     },
     [MODULE_SLUG_LEARN]: {
       name: "Learn",
@@ -1304,6 +1358,175 @@ function buildGalleryGroupsCollection() {
       }
     ]
   });
+}
+
+function buildMerchTagsCollection() {
+  const collection = buildGalleryTagsCollection();
+  collection.id = MERCH_TAGS_ID;
+  collection.name = MERCH_TAGS;
+  return collection;
+}
+
+function buildMerchPhotosCollectionWithoutProductAlbum() {
+  const collection = buildGalleryPhotosCollectionWithoutGroupAlbum();
+  collection.id = MERCH_PHOTOS_ID;
+  collection.name = MERCH_PHOTOS;
+
+  const tagsField = collection.fields.getByName("tags");
+  if (tagsField) {
+    tagsField.collectionId = MERCH_TAGS_ID;
+  }
+
+  return collection;
+}
+
+function buildMerchAlbumsCollection() {
+  const collection = buildGalleryAlbumsCollection();
+  collection.id = MERCH_ALBUMS_ID;
+  collection.name = MERCH_ALBUMS;
+
+  const coverPhotoField = collection.fields.getByName("coverPhoto");
+  if (coverPhotoField) {
+    coverPhotoField.collectionId = MERCH_PHOTOS_ID;
+  }
+
+  return collection;
+}
+
+function buildMerchProductsCollection() {
+  const collection = buildGalleryGroupsCollection();
+  collection.id = MERCH_PRODUCTS_ID;
+  collection.name = MERCH_PRODUCTS;
+
+  const coverPhotoField = collection.fields.getByName("coverPhoto");
+  if (coverPhotoField) {
+    coverPhotoField.collectionId = MERCH_PHOTOS_ID;
+  }
+  const photosField = collection.fields.getByName("photos");
+  if (photosField) {
+    photosField.collectionId = MERCH_PHOTOS_ID;
+  }
+  const albumField = collection.fields.getByName("album");
+  if (albumField) {
+    albumField.collectionId = MERCH_ALBUMS_ID;
+  }
+
+  if (!Array.isArray(collection.indexes)) {
+    collection.indexes = [];
+  }
+  if (!collection.indexes.some((index) => String(index).includes("idx_merch_products_slug"))) {
+    collection.indexes.push(`CREATE UNIQUE INDEX idx_merch_products_slug ON ${MERCH_PRODUCTS} (slug)`);
+  }
+
+  if (!collection.fields.getByName("name")) {
+    collection.fields.addAt(3, new Field({
+      "autogeneratePattern": "",
+      "hidden": false,
+      "id": "text_merch_name",
+      "max": 200,
+      "min": 0,
+      "name": "name",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": false,
+      "system": false,
+      "type": "text"
+    }));
+  }
+
+  if (!collection.fields.getByName("slug")) {
+    collection.fields.addAt(4, new Field({
+      "autogeneratePattern": "",
+      "hidden": false,
+      "id": "text_merch_slug",
+      "max": 200,
+      "min": 1,
+      "name": "slug",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "presentable": false,
+      "primaryKey": false,
+      "required": true,
+      "system": false,
+      "type": "text"
+    }));
+  }
+
+  if (!collection.fields.getByName("shortDescription")) {
+    collection.fields.addAt(5, new Field({
+      "autogeneratePattern": "",
+      "hidden": false,
+      "id": "text_merch_short",
+      "max": 1000,
+      "min": 0,
+      "name": "shortDescription",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": false,
+      "system": false,
+      "type": "text"
+    }));
+  }
+
+  if (!collection.fields.getByName("details")) {
+    collection.fields.addAt(6, new Field({
+      "hidden": false,
+      "id": "editor_merch_det",
+      "maxSize": 0,
+      "name": "details",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "editor"
+    }));
+  }
+
+  if (!collection.fields.getByName("price")) {
+    collection.fields.addAt(7, new Field({
+      "hidden": false,
+      "id": "number_merch_pr",
+      "max": null,
+      "min": 0,
+      "name": "price",
+      "onlyInt": false,
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "number"
+    }));
+  }
+
+  if (!collection.fields.getByName("currency")) {
+    collection.fields.addAt(8, new Field({
+      "autogeneratePattern": "",
+      "hidden": false,
+      "id": "text_merch_cur",
+      "max": 10,
+      "min": 0,
+      "name": "currency",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": false,
+      "system": false,
+      "type": "text"
+    }));
+  }
+
+  if (!collection.fields.getByName("active")) {
+    collection.fields.addAt(9, new Field({
+      "hidden": false,
+      "id": "bool_merch_act",
+      "name": "active",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "bool"
+    }));
+  }
+
+  return collection;
 }
 
 function buildLearnSubscriptionTiersCollection() {
@@ -2394,6 +2617,71 @@ function purgeGalleryCollections() {
   dropCollectionByName(GALLERY_TAGS);
 }
 
+function ensureMerchCollections() {
+  const tags = findCollectionSafe(MERCH_TAGS);
+  const photos = findCollectionSafe(MERCH_PHOTOS);
+  const products = findCollectionSafe(MERCH_PRODUCTS);
+  const albums = findCollectionSafe(MERCH_ALBUMS);
+
+  if (tags && photos && products && albums) {
+    return;
+  }
+
+  // Remove partial state before recreating in a deterministic order.
+  dropCollectionByName(MERCH_PRODUCTS);
+  dropCollectionByName(MERCH_ALBUMS);
+  dropCollectionByName(MERCH_PHOTOS);
+  dropCollectionByName(MERCH_TAGS);
+
+  $app.save(buildMerchTagsCollection());
+  $app.save(buildMerchPhotosCollectionWithoutProductAlbum());
+  $app.save(buildMerchAlbumsCollection());
+  $app.save(buildMerchProductsCollection());
+
+  const photosCollection = $app.findCollectionByNameOrId(MERCH_PHOTOS_ID);
+
+  if (!photosCollection.fields.getByName("product")) {
+    photosCollection.fields.addAt(6, new Field({
+      "cascadeDelete": false,
+      "collectionId": MERCH_PRODUCTS_ID,
+      "hidden": false,
+      "id": "relation_merch_pr",
+      "maxSelect": 1,
+      "minSelect": 0,
+      "name": "product",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "relation"
+    }));
+  }
+
+  if (!photosCollection.fields.getByName("album")) {
+    photosCollection.fields.addAt(7, new Field({
+      "cascadeDelete": false,
+      "collectionId": MERCH_ALBUMS_ID,
+      "hidden": false,
+      "id": "relation_merch_al",
+      "maxSelect": 1,
+      "minSelect": 0,
+      "name": "album",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "relation"
+    }));
+  }
+
+  $app.save(photosCollection);
+}
+
+function purgeMerchCollections() {
+  dropCollectionByName(MERCH_PRODUCTS);
+  dropCollectionByName(MERCH_ALBUMS);
+  dropCollectionByName(MERCH_PHOTOS);
+  dropCollectionByName(MERCH_TAGS);
+}
+
 function ensureLearnCollections() {
   if (hasAllLearnCollections()) {
     return;
@@ -2437,6 +2725,11 @@ function ensureCollectionsForModule(slug) {
     return;
   }
 
+  if (slug === MODULE_SLUG_MERCH) {
+    ensureMerchCollections();
+    return;
+  }
+
   if (slug === MODULE_SLUG_LEARN) {
     ensureLearnCollections();
     return;
@@ -2448,6 +2741,11 @@ function ensureCollectionsForModule(slug) {
 function purgeCollectionsForModule(slug) {
   if (slug === MODULE_SLUG_GALLERY) {
     purgeGalleryCollections();
+    return;
+  }
+
+  if (slug === MODULE_SLUG_MERCH) {
+    purgeMerchCollections();
     return;
   }
 
@@ -2476,6 +2774,7 @@ function clearMainModuleSelection() {
 
 module.exports = {
   MODULE_SLUG_GALLERY,
+  MODULE_SLUG_MERCH,
   MODULE_SLUG_LEARN,
   COLLECTION_MODULES,
   isSupportedModuleSlug,

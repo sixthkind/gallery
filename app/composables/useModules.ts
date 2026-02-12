@@ -1,5 +1,5 @@
 import { pb } from "#imports";
-import { CORE_COLLECTIONS, GALLERY_COLLECTIONS, LEARN_COLLECTIONS } from "~/utils/collections";
+import { CORE_COLLECTIONS, GALLERY_COLLECTIONS, LEARN_COLLECTIONS, MERCH_COLLECTIONS } from "~/utils/collections";
 import { authUtils } from "~/utils/auth";
 
 export type ModuleNavbarButton = {
@@ -58,6 +58,17 @@ const DEFAULT_MODULE_CONFIGS: Record<string, ModuleConfig> = {
       titleText: "Gallery",
       buttons: [
         { title: "Albums", path: "/albums", icon: "heroicons:rectangle-stack" },
+        { title: "Tags", path: "/tags", icon: "heroicons:tag" }
+      ]
+    },
+    settings: {
+      titleEditable: true
+    }
+  },
+  merch: {
+    navbar: {
+      titleText: "Merch",
+      buttons: [
         { title: "Tags", path: "/tags", icon: "heroicons:tag" }
       ]
     },
@@ -143,9 +154,15 @@ const normalizeModuleConfig = (slug: string, rawConfig: any): ModuleConfig => {
     .map((button: any) => normalizeButton(button))
     .filter((button: ModuleNavbarButton | null): button is ModuleNavbarButton => !!button);
 
-  const buttons = normalizedButtons.length > 0
+  let buttons = normalizedButtons.length > 0
     ? normalizedButtons
     : defaults.navbar.buttons;
+  if (slug === "merch") {
+    buttons = buttons.filter((button) => button.path === "/tags");
+    if (buttons.length === 0) {
+      buttons = defaults.navbar.buttons;
+    }
+  }
 
   return {
     navbar: {
@@ -171,6 +188,17 @@ const INSTALLABLE_MODULES: ModuleRecord[] = [
     routeBase: "/gallery",
     collectionPrefix: "gallery_",
     config: getDefaultModuleConfig("gallery")
+  },
+  {
+    id: "catalog-merch",
+    slug: "merch",
+    name: "Merch",
+    description: "Merchandise catalog module",
+    installed: false,
+    isMain: false,
+    routeBase: "/merch",
+    collectionPrefix: "merch_",
+    config: getDefaultModuleConfig("merch")
   },
   {
     id: "catalog-learn",
@@ -252,12 +280,20 @@ export const useModules = () => {
 
   const fallbackFromCatalogProbe = async () => {
     let galleryInstalled = false;
+    let merchInstalled = false;
     let learnInstalled = false;
     try {
       await pb.collection(GALLERY_COLLECTIONS.photos).getList(1, 1, { fields: "id" });
       galleryInstalled = true;
     } catch (error) {
       galleryInstalled = false;
+    }
+
+    try {
+      await pb.collection(MERCH_COLLECTIONS.photos).getList(1, 1, { fields: "id" });
+      merchInstalled = true;
+    } catch (error) {
+      merchInstalled = false;
     }
 
     try {
@@ -270,6 +306,9 @@ export const useModules = () => {
     return INSTALLABLE_MODULES.map((module) => {
       if (module.slug === "gallery") {
         return { ...module, installed: galleryInstalled, isMain: false, config: getDefaultModuleConfig("gallery") };
+      }
+      if (module.slug === "merch") {
+        return { ...module, installed: merchInstalled, isMain: false, config: getDefaultModuleConfig("merch") };
       }
       if (module.slug === "learn") {
         return { ...module, installed: learnInstalled, isMain: false, config: getDefaultModuleConfig("learn") };

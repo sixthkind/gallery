@@ -33,6 +33,14 @@ export const tableColumns: any = {
     { label: 'Published', key: 'publishedFormatted', sortable: true },
     { label: 'Created', key: 'createdFormatted', sortable: true }
   ],
+  products: [
+    { label: 'Name', key: 'name', sortable: true },
+    { label: 'Slug', key: 'slug', sortable: true },
+    { label: 'Price', key: 'priceFormatted', sortable: true },
+    { label: 'Currency', key: 'currencyFormatted', sortable: true },
+    { label: 'Active', key: 'activeFormatted', sortable: true },
+    { label: 'Created', key: 'createdFormatted', sortable: true }
+  ],
   sections: [
     { label: 'Title', key: 'title', sortable: true },
     { label: 'Course', key: 'courseFormatted', sortable: true },
@@ -101,6 +109,14 @@ export const tableComputed: Record<string, (row: Record<string, any>) => Record<
       (row.expand?.courses ? (Array.isArray(row.expand.courses) ? `${row.expand.courses.length} courses` : '1 course') : '0 courses'),
     priceFormatted: row.price && row.price > 0 ? `$${row.price.toFixed(2)}` : 'Free',
     publishedFormatted: row.published ? '✓ Published' : '✗ Draft',
+    createdFormatted: row.created ? new Date(row.created).toLocaleDateString('en-CA', {
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    }) : 'N/A'
+  }),
+  products: (row) => ({
+    priceFormatted: typeof row.price === 'number' ? `$${row.price.toFixed(2)}` : '$0.00',
+    currencyFormatted: (row.currency || 'USD').toUpperCase(),
+    activeFormatted: row.active ? '✓ Active' : '✗ Inactive',
     createdFormatted: row.created ? new Date(row.created).toLocaleDateString('en-CA', {
       year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
     }) : 'N/A'

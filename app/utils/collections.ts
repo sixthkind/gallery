@@ -5,6 +5,14 @@ export const GALLERY_COLLECTIONS = {
   tags: "gallery_tags"
 } as const;
 
+export const MERCH_COLLECTIONS = {
+  photos: "merch_photos",
+  albums: "merch_albums",
+  products: "merch_products",
+  groups: "merch_products",
+  tags: "merch_tags"
+} as const;
+
 export const LEARN_COLLECTIONS = {
   courses: "_learn_courses",
   sections: "_learn_sections",
@@ -26,7 +34,8 @@ export const resolveEditCollection = (type: string) => {
     sections: LEARN_COLLECTIONS.sections,
     lessons: LEARN_COLLECTIONS.lessons,
     modules: LEARN_COLLECTIONS.modules,
-    subscription_tiers: LEARN_COLLECTIONS.subscriptionTiers
+    subscription_tiers: LEARN_COLLECTIONS.subscriptionTiers,
+    products: MERCH_COLLECTIONS.products
   };
   return map[type] || type;
 };

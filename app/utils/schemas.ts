@@ -142,6 +142,15 @@ const schemas: any = {
     price: { type: 'text', label: 'Price (USD)', inputType: 'number', default: 0, floating: true },
     published: { type: 'toggle', label: 'Published', default: false }
   },
+  products: {
+    name: { type: 'text', label: 'Name' },
+    slug: { type: 'text', label: 'Slug' },
+    price: { type: 'text', label: 'Price (USD)', inputType: 'number', default: 0, floating: true },
+    currency: { type: 'text', label: 'Currency', default: 'USD' },
+    shortDescription: { type: 'textarea', label: 'Short Description' },
+    details: { type: 'editor', label: 'Details' },
+    active: { type: 'toggle', label: 'Active', default: true }
+  },
   notdeletable: ['users']
 };
 

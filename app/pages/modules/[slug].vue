@@ -29,6 +29,17 @@ const DEFAULT_MODULE_CONFIGS: Record<string, any> = {
       titleEditable: true
     }
   },
+  merch: {
+    navbar: {
+      titleText: "Merch",
+      buttons: [
+        { title: "Tags", path: "/tags", icon: "heroicons:tag" }
+      ]
+    },
+    settings: {
+      titleEditable: true
+    }
+  },
   learn: {
     navbar: {
       titleText: "Learn",
@@ -52,14 +63,19 @@ const withConfigFallback = (input: any, currentSlug: string) => {
   const sourceNavbar = source.navbar && typeof source.navbar === "object" ? source.navbar : {};
   const sourceSettings = source.settings && typeof source.settings === "object" ? source.settings : {};
 
+  const sourceButtons = Array.isArray(sourceNavbar.buttons) && sourceNavbar.buttons.length > 0
+    ? sourceNavbar.buttons
+    : fallback.navbar.buttons;
+  const normalizedButtons = currentSlug === "merch"
+    ? sourceButtons.filter((button: any) => String(button?.path || "").trim() === "/tags")
+    : sourceButtons;
+
   return {
     navbar: {
       titleText: typeof sourceNavbar.titleText === "string" && sourceNavbar.titleText.trim()
         ? sourceNavbar.titleText.trim()
         : fallback.navbar.titleText,
-      buttons: Array.isArray(sourceNavbar.buttons) && sourceNavbar.buttons.length > 0
-        ? sourceNavbar.buttons
-        : fallback.navbar.buttons
+      buttons: normalizedButtons.length > 0 ? normalizedButtons : fallback.navbar.buttons
     },
     settings: {
       titleEditable: sourceSettings.titleEditable === undefined

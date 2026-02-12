@@ -15,6 +15,10 @@ const isGalleryMain = computed(() => {
   return modules.value.some((module) => module.slug === "gallery" && module.installed && module.isMain);
 });
 
+const isMerchMain = computed(() => {
+  return modules.value.some((module) => module.slug === "merch" && module.installed && module.isMain);
+});
+
 onMounted(async () => {
   try {
     await refreshModules();
@@ -26,6 +30,7 @@ onMounted(async () => {
 
 <template>
   <LearnPagesMain v-if="isLearnMain" />
+  <MerchPagesMain v-else-if="isMerchMain" />
   <GalleryPagesMain v-else-if="isGalleryMain" />
 
   <ion-page v-else>

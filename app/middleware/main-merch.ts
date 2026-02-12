@@ -8,10 +8,8 @@ export default defineNuxtRouteMiddleware(async () => {
   const { modules, refreshModules } = useModules();
   await refreshModules(true);
 
-  const gallery = modules.value.find((module) => module.slug === "gallery");
   const merch = modules.value.find((module) => module.slug === "merch");
-  const galleryOrMerchMain = !!(gallery?.installed && gallery?.isMain) || !!(merch?.installed && merch?.isMain);
-  if (!galleryOrMerchMain) {
+  if (!merch?.installed || !merch?.isMain) {
     return navigateTo("/");
   }
 });
