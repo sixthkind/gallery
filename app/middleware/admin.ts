@@ -13,11 +13,14 @@ export default defineNuxtRouteMiddleware((to, from) => {
   const record: any = pb.authStore.record;
   const isSuperuser = record?.collectionName === '_superusers';
 
-  // Redirect if not authenticated or not superuser
-  if (!isAuthenticated || !isSuperuser) {
-    return navigateTo('/');
+  if (!isAuthenticated) {
+    return navigateTo('/admin');
+  }
+
+  // Redirect authenticated non-superusers away from protected admin pages.
+  if (!isSuperuser) {
+    return navigateTo('/admin');
   }
 });
-
 
 

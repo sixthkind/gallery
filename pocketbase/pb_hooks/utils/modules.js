@@ -260,6 +260,16 @@ function requireAuth(e) {
   }
 }
 
+function requireSuperuser(e) {
+  const auth = requireAuth(e);
+  if (!auth || typeof auth.isSuperuser !== "function" || !auth.isSuperuser()) {
+    const error = new Error("Forbidden: superuser access required");
+    error.status = 403;
+    throw error;
+  }
+  return auth;
+}
+
 function findModuleBySlugSafe(slug) {
   try {
     return $app.findFirstRecordByFilter(
@@ -344,9 +354,9 @@ function buildModulesCollection() {
     "system": false,
     "listRule": "@request.auth.id != ''",
     "viewRule": "@request.auth.id != ''",
-    "createRule": "@request.auth.id != ''",
-    "updateRule": "@request.auth.id != ''",
-    "deleteRule": "@request.auth.id != ''",
+    "createRule": "@request.auth.collectionName = '_superusers'",
+    "updateRule": "@request.auth.collectionName = '_superusers'",
+    "deleteRule": "@request.auth.collectionName = '_superusers'",
     "indexes": [
       "CREATE UNIQUE INDEX idx_modules_slug ON modules (slug)"
     ],
@@ -607,9 +617,9 @@ function buildGalleryTagsCollection() {
     "system": false,
     "listRule": "",
     "viewRule": "",
-    "createRule": "@request.auth.id != ''",
-    "updateRule": "@request.auth.id != ''",
-    "deleteRule": "@request.auth.id != ''",
+    "createRule": "@request.auth.collectionName = '_superusers'",
+    "updateRule": "@request.auth.collectionName = '_superusers'",
+    "deleteRule": "@request.auth.collectionName = '_superusers'",
     "indexes": [],
     "fields": [
       {
@@ -685,9 +695,9 @@ function buildGalleryPhotosCollectionWithoutGroupAlbum() {
     "system": false,
     "listRule": "",
     "viewRule": "",
-    "createRule": "@request.auth.id = user",
-    "updateRule": "@request.auth.id = user",
-    "deleteRule": "@request.auth.id = user",
+    "createRule": "@request.auth.collectionName = '_superusers'",
+    "updateRule": "@request.auth.collectionName = '_superusers'",
+    "deleteRule": "@request.auth.collectionName = '_superusers'",
     "indexes": [],
     "fields": [
       {
@@ -1035,9 +1045,9 @@ function buildGalleryAlbumsCollection() {
     "system": false,
     "listRule": "",
     "viewRule": "",
-    "createRule": "@request.auth.id = user",
-    "updateRule": "@request.auth.id = user",
-    "deleteRule": "@request.auth.id = user",
+    "createRule": "@request.auth.collectionName = '_superusers'",
+    "updateRule": "@request.auth.collectionName = '_superusers'",
+    "deleteRule": "@request.auth.collectionName = '_superusers'",
     "indexes": [],
     "fields": [
       {
@@ -1152,9 +1162,9 @@ function buildGalleryGroupsCollection() {
     "system": false,
     "listRule": "",
     "viewRule": "",
-    "createRule": "@request.auth.id = user",
-    "updateRule": "@request.auth.id = user",
-    "deleteRule": "@request.auth.id = user",
+    "createRule": "@request.auth.collectionName = '_superusers'",
+    "updateRule": "@request.auth.collectionName = '_superusers'",
+    "deleteRule": "@request.auth.collectionName = '_superusers'",
     "indexes": [],
     "fields": [
       {
@@ -1482,9 +1492,9 @@ function buildLearnCoursesCollection() {
     "system": false,
     "listRule": "@request.auth.id != '' || published = true",
     "viewRule": "@request.auth.id != '' || published = true",
-    "createRule": "@request.auth.id != ''",
-    "updateRule": "@request.auth.id != ''",
-    "deleteRule": "@request.auth.id != ''",
+    "createRule": "@request.auth.collectionName = '_superusers'",
+    "updateRule": "@request.auth.collectionName = '_superusers'",
+    "deleteRule": "@request.auth.collectionName = '_superusers'",
     "indexes": [],
     "fields": [
       {
@@ -1614,9 +1624,9 @@ function buildLearnSectionsCollection() {
     "system": false,
     "listRule": "@request.auth.id != '' || course.published = true",
     "viewRule": "@request.auth.id != '' || course.published = true",
-    "createRule": "@request.auth.id != ''",
-    "updateRule": "@request.auth.id != ''",
-    "deleteRule": "@request.auth.id != ''",
+    "createRule": "@request.auth.collectionName = '_superusers'",
+    "updateRule": "@request.auth.collectionName = '_superusers'",
+    "deleteRule": "@request.auth.collectionName = '_superusers'",
     "indexes": [`CREATE INDEX idx_learn_section_course ON ${LEARN_SECTIONS} (course)`],
     "fields": [
       {
@@ -1704,9 +1714,9 @@ function buildLearnLessonsCollection() {
     "system": false,
     "listRule": "@request.auth.id != '' || section.course.published = true",
     "viewRule": "@request.auth.id != '' || section.course.published = true",
-    "createRule": "@request.auth.id != ''",
-    "updateRule": "@request.auth.id != ''",
-    "deleteRule": "@request.auth.id != ''",
+    "createRule": "@request.auth.collectionName = '_superusers'",
+    "updateRule": "@request.auth.collectionName = '_superusers'",
+    "deleteRule": "@request.auth.collectionName = '_superusers'",
     "indexes": [`CREATE INDEX idx_learn_lesson_section ON ${LEARN_LESSONS} (section)`],
     "fields": [
       {
@@ -1818,9 +1828,9 @@ function buildLearnModulesCollection() {
     "system": false,
     "listRule": "@request.auth.id != '' || published = true",
     "viewRule": "@request.auth.id != '' || published = true",
-    "createRule": "@request.auth.id != ''",
-    "updateRule": "@request.auth.id != ''",
-    "deleteRule": "@request.auth.id != ''",
+    "createRule": "@request.auth.collectionName = '_superusers'",
+    "updateRule": "@request.auth.collectionName = '_superusers'",
+    "deleteRule": "@request.auth.collectionName = '_superusers'",
     "indexes": [],
     "fields": [
       {
@@ -2471,6 +2481,7 @@ module.exports = {
   isSupportedModuleSlug,
   setCORSHeaders,
   requireAuth,
+  requireSuperuser,
   ensureModulesCollectionAndSeed,
   getOrCreateModuleRecord,
   ensureModuleConfigDefaults,

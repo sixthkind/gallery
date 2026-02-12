@@ -82,6 +82,7 @@
             </a>
 
             <a
+              v-if="isSuperuser"
               href="/modules"
               class="hidden md:inline-flex items-center gap-2 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border px-3 py-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
               title="Modules"
@@ -169,6 +170,7 @@
   const emailDomain = computed(() => email.value.split("@")[1]);
 
   const open = ref(false);
+  const { isSuperuser } = usePermissions();
   const { modules, refreshModules, isInstalled } = useModules();
 
   const galleryInstalled = computed(() => isInstalled("gallery"));
@@ -323,12 +325,14 @@
       ...activeModuleDesktopButtons.value
     ];
 
-    if (pb.authStore.isValid) {
+    if (isSuperuser.value) {
       items.push({
         title: "Modules",
         path: "/modules",
         icon: "heroicons:cog-6-tooth"
       });
+    }
+    if (pb.authStore.isValid) {
       items.push({
         title: "Profile",
         path: "/profile",
@@ -357,7 +361,7 @@
   });
   const galleryState = useGalleryState();
   const showGalleryActions = computed(() => {
-    return pb.authStore.isValid && activeModuleSlug.value === "gallery" && isGalleryPage.value && !!galleryState;
+    return isSuperuser.value && activeModuleSlug.value === "gallery" && isGalleryPage.value && !!galleryState;
   });
 </script>
 

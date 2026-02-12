@@ -1,6 +1,6 @@
 <script setup>
 definePageMeta({
-  middleware: "edit-access"
+  middleware: []
 });
 </script>
 
@@ -8,7 +8,7 @@ definePageMeta({
   <ion-page>
     <ion-content>
       <CommonContainer>
-        <CommonEdit />
+        <AuthAdminSignin />
       </CommonContainer>
     </ion-content>
   </ion-page>

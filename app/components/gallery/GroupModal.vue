@@ -119,10 +119,10 @@
             </button>
             <button
               type="submit"
-              :disabled="!formData.title || !formData.coverPhotoId || saving"
+              :disabled="!isSuperuser || !formData.title || !formData.coverPhotoId || saving"
               :class="[
                 'flex-1 px-4 py-2 rounded-lg font-semibold transition-colors duration-200',
-                !formData.title || !formData.coverPhotoId || saving
+                !isSuperuser || !formData.title || !formData.coverPhotoId || saving
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-500 hover:bg-blue-600 text-white'
               ]"
@@ -139,7 +139,8 @@
 <script setup>
 import { pb } from '#imports';
 import { GALLERY_COLLECTIONS } from '~/utils/collections';
-import { ref, reactive, watch } from 'vue';
+import { authUtils } from '~/utils/auth';
+import { ref, reactive, watch, computed } from 'vue';
 
 const props = defineProps({
   isOpen: {
@@ -167,6 +168,7 @@ const formData = reactive({
 
 const saving = ref(false);
 const error = ref(null);
+const isSuperuser = computed(() => authUtils.isSuperuser());
 
 // Get photo URL with thumbnail
 const getPhotoUrl = (photo, thumb = '200x200') => {
@@ -197,6 +199,7 @@ const close = () => {
 
 // Handle form submission
 const handleSubmit = async () => {
+  if (!isSuperuser.value) return;
   if (!formData.title || !formData.coverPhotoId) {
     error.value = 'Please fill in all required fields';
     return;

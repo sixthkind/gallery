@@ -1,6 +1,7 @@
 <script setup>
 import { pb } from '#imports';
 import { GALLERY_COLLECTIONS } from '~/utils/collections';
+import { authUtils } from '~/utils/auth';
 import { ref, computed, onMounted, onActivated, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 
@@ -16,7 +17,7 @@ const form = ref({
 });
 const error = ref(null);
 
-const isAuthenticated = computed(() => pb.authStore.isValid);
+const isSuperuser = computed(() => authUtils.isSuperuser());
 const { selectionMode } = useGalleryState();
 const { toGalleryPath } = useGalleryRoutes();
 
@@ -26,7 +27,7 @@ const getAlbumDateValue = (album) => {
 };
 
 const ensureAlbumSortOrder = async (items) => {
-  if (!pb.authStore.isValid) return;
+  if (!isSuperuser.value) return;
   const missing = items.filter(item => typeof item.sortOrder !== 'number');
   if (missing.length === 0) return;
 
@@ -60,7 +61,7 @@ const ensureAlbumSortOrder = async (items) => {
 };
 
 const normalizeAlbumSortOrder = async (items) => {
-  if (!pb.authStore.isValid) return;
+  if (!isSuperuser.value) return;
   if (!items || items.length === 0) return;
   const numericOrders = items
     .map(item => item.sortOrder)
@@ -173,6 +174,7 @@ const setAlbumSortOrder = (albumId, sortOrder) => {
 };
 
 const reorderAlbums = async ({ sourceId, targetId }) => {
+  if (!isSuperuser.value) return;
   if (!selectionMode.value) return;
   if (!sourceId || !targetId || sourceId === targetId) return;
 
@@ -241,11 +243,13 @@ const reorderAlbums = async ({ sourceId, targetId }) => {
 };
 
 const toggleCreate = () => {
+  if (!isSuperuser.value) return;
   showCreate.value = !showCreate.value;
   error.value = null;
 };
 
 const createAlbum = async () => {
+  if (!isSuperuser.value) return;
   if (!form.value.title.trim()) {
     error.value = 'Title is required.';
     return;
@@ -289,7 +293,7 @@ watch(() => route.fullPath, () => {
         <div class="flex items-center justify-between mt-4 mb-6">
           <h1 class="text-2xl font-bold text-gray-800">Albums</h1>
           <button
-            v-if="isAuthenticated"
+            v-if="isSuperuser"
             @click="toggleCreate"
             class="bg-white bg-opacity-70 backdrop-blur rounded-lg border px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-opacity-90 transition-colors"
           >

@@ -1,5 +1,5 @@
 <template>
-  <div class="photo-upload-wrapper">
+  <div v-if="isSuperuser" class="photo-upload-wrapper">
     <div class="bg-white rounded-lg shadow-md p-6">
       <h2 class="text-2xl font-bold mb-4">Upload Photos</h2>
       
@@ -168,6 +168,7 @@
 <script setup>
 import { pb } from '#imports';
 import { GALLERY_COLLECTIONS } from '~/utils/collections';
+import { authUtils } from '~/utils/auth';
 import { ref, computed } from 'vue';
 import exifr from 'exifr';
 
@@ -185,6 +186,7 @@ const isDragging = ref(false);
 const selectedFiles = ref([]);
 const uploading = ref(false);
 const fileInput = ref(null);
+const isSuperuser = computed(() => authUtils.isSuperuser());
 
 const allUploaded = computed(() => {
   return selectedFiles.value.length > 0 && selectedFiles.value.every(f => f.uploaded);
@@ -192,6 +194,7 @@ const allUploaded = computed(() => {
 
 // Handle file drop
 const handleDrop = (e) => {
+  if (!isSuperuser.value) return;
   isDragging.value = false;
   const files = Array.from(e.dataTransfer.files).filter(file => 
     file.type.startsWith('image/')
@@ -201,6 +204,7 @@ const handleDrop = (e) => {
 
 // Handle file select from input
 const handleFileSelect = (e) => {
+  if (!isSuperuser.value) return;
   const files = Array.from(e.target.files);
   addFiles(files);
   // Reset input so same file can be selected again
@@ -290,6 +294,7 @@ const formatFileSize = (bytes) => {
 
 // Upload all photos
 const uploadPhotos = async () => {
+  if (!isSuperuser.value) return;
   uploading.value = true;
   let albumCoverId = null;
   let shouldSetCover = false;

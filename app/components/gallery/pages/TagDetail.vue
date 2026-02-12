@@ -1,6 +1,7 @@
 <script setup>
 import { pb } from '#imports';
 import { GALLERY_COLLECTIONS } from '~/utils/collections';
+import { authUtils } from '~/utils/auth';
 import { alertController } from '@ionic/vue';
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -16,7 +17,7 @@ const selectedPhoto = ref(null);
 const isEditingTag = ref(false);
 const pendingTagName = ref('');
 const saveTimer = ref(null);
-const isAuthenticated = computed(() => pb.authStore.isValid);
+const isSuperuser = computed(() => authUtils.isSuperuser());
 const isDeletingTag = ref(false);
 const { toGalleryPath } = useGalleryRoutes();
 
@@ -89,14 +90,14 @@ const closeLightbox = () => {
 const allPhotosForLightbox = computed(() => photos.value);
 
 const startTagEdit = async () => {
-  if (!isAuthenticated.value) return;
+  if (!isSuperuser.value) return;
   isEditingTag.value = true;
   pendingTagName.value = tagRecord.value?.name || '';
   await nextTick();
 };
 
 const queueTagSave = () => {
-  if (!isAuthenticated.value || !tagRecord.value) return;
+  if (!isSuperuser.value || !tagRecord.value) return;
   clearTimeout(saveTimer.value);
   saveTimer.value = setTimeout(async () => {
     const newName = pendingTagName.value.trim();
@@ -134,7 +135,7 @@ const goBack = () => {
 };
 
 const deleteTag = async () => {
-  if (!isAuthenticated.value || !tagRecord.value || isDeletingTag.value) return;
+  if (!isSuperuser.value || !tagRecord.value || isDeletingTag.value) return;
   const tagLabel = tagRecord.value?.name || String(tagName.value || '').trim() || 'this tag';
   const alert = await alertController.create({
     header: 'Delete Tag',
@@ -228,7 +229,7 @@ watch(pendingTagName, () => {
             <span class="text-2xl font-bold text-gray-800"><span style="margin-right: -6px;">#</span></span>
             <span v-if="!isEditingTag" class="text-2xl font-bold text-gray-800">
               <button
-                :class="isAuthenticated ? 'cursor-pointer hover:text-gray-900' : ''"
+                :class="isSuperuser ? 'cursor-pointer hover:text-gray-900' : ''"
                 @click="startTagEdit"
               >
                 {{ tagRecord?.name || tagName }}
@@ -248,7 +249,7 @@ watch(pendingTagName, () => {
           </div>
           <div class="flex items-center gap-3">
             <button
-              v-if="isAuthenticated"
+              v-if="isSuperuser"
               @click="deleteTag"
               :disabled="isDeletingTag"
               class="bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors flex items-center gap-2"

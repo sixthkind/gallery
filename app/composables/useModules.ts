@@ -1,5 +1,6 @@
 import { pb } from "#imports";
 import { CORE_COLLECTIONS, GALLERY_COLLECTIONS, LEARN_COLLECTIONS } from "~/utils/collections";
+import { authUtils } from "~/utils/auth";
 
 export type ModuleNavbarButton = {
   title: string;
@@ -338,43 +339,33 @@ export const useModules = () => {
     return modules.value.some((module) => module.slug === slug && module.installed);
   };
 
+  const requireSuperuser = () => {
+    if (!authUtils.isSuperuser()) {
+      throw new Error("Forbidden: superuser access required");
+    }
+  };
+
   const installModule = async (slug: string) => {
+    requireSuperuser();
     await callModulesAPI(`/api/modules/${encodeURIComponent(slug)}/install`, "POST");
     await refreshModules(true);
   };
 
   const uninstallModule = async (slug: string) => {
+    requireSuperuser();
     await callModulesAPI(`/api/modules/${encodeURIComponent(slug)}/uninstall`, "POST");
     await refreshModules(true);
   };
 
   const setMainModule = async (slug: string) => {
-    try {
-      await callModulesAPI(`/api/modules/${encodeURIComponent(slug)}/set-main`, "POST");
-    } catch (error) {
-      const records = await pb.collection(CORE_COLLECTIONS.modules).getFullList();
-      const target = records.find((record: any) => String(record.slug) === slug);
-      if (!target) throw error;
-      if (!target.installed) {
-        throw new Error("Module must be installed before it can be set as main");
-      }
-      await Promise.all(records.map((record: any) =>
-        pb.collection(CORE_COLLECTIONS.modules).update(record.id, { isMain: false })
-      ));
-      await pb.collection(CORE_COLLECTIONS.modules).update(target.id, { isMain: true });
-    }
+    requireSuperuser();
+    await callModulesAPI(`/api/modules/${encodeURIComponent(slug)}/set-main`, "POST");
     await refreshModules(true);
   };
 
   const unsetMainModule = async (slug: string) => {
-    try {
-      await callModulesAPI(`/api/modules/${encodeURIComponent(slug)}/unset-main`, "POST");
-    } catch (error) {
-      const records = await pb.collection(CORE_COLLECTIONS.modules).getFullList();
-      const target = records.find((record: any) => String(record.slug) === slug);
-      if (!target) throw error;
-      await pb.collection(CORE_COLLECTIONS.modules).update(target.id, { isMain: false });
-    }
+    requireSuperuser();
+    await callModulesAPI(`/api/modules/${encodeURIComponent(slug)}/unset-main`, "POST");
     await refreshModules(true);
   };
 
@@ -413,6 +404,7 @@ export const useModules = () => {
   };
 
   const updateModuleConfig = async (slug: string, configPatch: ModuleConfigPatch) => {
+    requireSuperuser();
     const response = await callModulesAPI(`/api/modules/${encodeURIComponent(slug)}/config`, "POST", {
       config: configPatch
     }) as ModuleConfigResponse;

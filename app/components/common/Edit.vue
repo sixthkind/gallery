@@ -63,8 +63,9 @@
 </template>
 
 <script setup>
-  import { ref } from 'vue';
+  import { ref, computed } from 'vue';
   import { pb, getSchema, Utils } from '#imports';
+  import { authUtils } from '~/utils/auth';
   import { resolveEditCollection } from '~/utils/collections';
   import { useRoute } from 'vue-router';
   const route = useRoute();
@@ -77,6 +78,16 @@
 
   const type = route.params.type;
   const id = route.params.id;
+  const normalizedType = String(type || '').toLowerCase();
+  const normalizedId = id ? String(id) : '';
+  const isSuperuser = computed(() => authUtils.isSuperuser());
+  const currentUserId = computed(() => String(pb.authStore.record?.id || ''));
+  const isEditAllowed = computed(() => {
+    if (isSuperuser.value) return true;
+    if (!pb.authStore.isValid) return false;
+    if (normalizedType !== 'users') return false;
+    return !!normalizedId && normalizedId === currentUserId.value;
+  });
   const collectionName = resolveEditCollection(String(type));
 
   // the following are used when creating a new item and the item is related to another item
@@ -104,6 +115,11 @@
   const errorMessage = ref('')
 
   const init = async () => {
+    if (!isEditAllowed.value) {
+      await navigateTo('/');
+      return;
+    }
+
     if (id) {
       // If there is an id, get the record
       const record = await pb.collection(collectionName).getOne(String(id));
@@ -155,6 +171,7 @@
   }
 
   const handleSubmit = async () => {
+    if (!isEditAllowed.value) return;
     try {
       if (id) {
         await updateItem();
@@ -256,6 +273,7 @@
   }
 
   const updateItem = async () => {
+    if (!isEditAllowed.value) return;
     try {
       const formData = createSharedFormData();
       printFormData(formData);
@@ -267,6 +285,7 @@
   }
 
   const createItem = async () => {
+    if (!isEditAllowed.value) return;
     try {
       const formData = createSharedFormData();
 
@@ -287,6 +306,7 @@
   }
 
   const deleteItem = async () => {
+    if (!isEditAllowed.value) return;
     // Safety check - prevent deletion if type is in nonDeletableTypes
     if (!isDeletionAllowed) {
       console.error('This type cannot be deleted');
@@ -303,8 +323,10 @@
     goBack();
   }
 
-  init();
-  isLoaded.value = true;
+  await init();
+  if (isEditAllowed.value) {
+    isLoaded.value = true;
+  }
 </script>
 
 <style scoped>

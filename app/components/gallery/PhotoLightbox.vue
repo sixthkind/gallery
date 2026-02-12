@@ -70,7 +70,7 @@
                 class="text-lg"
                 :class="[
                   localTitle ? 'text-white' : 'text-white/50',
-                  isAuthenticated ? 'cursor-pointer hover:text-white' : ''
+                  isSuperuser ? 'cursor-pointer hover:text-white' : ''
                 ]"
                 @click="startTitleEdit"
               >
@@ -98,7 +98,7 @@
             >
               {{ tag.name }}
               <button
-                v-if="isAuthenticated"
+                v-if="isSuperuser"
                 @click.stop="removeTag(tag)"
                 class="text-white/70 hover:text-white"
                 aria-label="Remove tag"
@@ -119,7 +119,7 @@
               <span>Full Res</span>
             </button>
           </div>
-          <div v-if="isAuthenticated" class="mt-3 flex items-center gap-2">
+          <div v-if="isSuperuser" class="mt-3 flex items-center gap-2">
             <input
               v-model="tagInput"
               type="text"
@@ -143,7 +143,7 @@
                 <span
                   v-if="!isEditingLocation"
                   class="text-white/70"
-                  :class="isAuthenticated ? 'cursor-pointer hover:text-white' : ''"
+                  :class="isSuperuser ? 'cursor-pointer hover:text-white' : ''"
                   @click="startLocationEdit"
                 >
                   {{ locationDisplayText }}
@@ -226,6 +226,7 @@
 <script setup>
 import { pb } from '#imports';
 import { GALLERY_COLLECTIONS } from '~/utils/collections';
+import { authUtils } from '~/utils/auth';
 import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -249,7 +250,7 @@ const tagInput = ref('');
 const isMetadataExpanded = ref(false);
 const infoContainer = ref(null);
 const containerMinHeight = ref('auto');
-const isAuthenticated = computed(() => pb.authStore.isValid);
+const isSuperuser = computed(() => authUtils.isSuperuser());
 const fullSizeRequested = ref(false);
 const fullSizeLoading = ref(false);
 const fullSizeLoaded = ref(false);
@@ -263,10 +264,10 @@ const titleSaveTimer = ref(null);
 const locationSaveTimer = ref(null);
 
 const displayTitle = computed(() => localTitle.value || props.photo?.title || 'Photo');
-const showTitle = computed(() => isAuthenticated.value || !!localTitle.value);
-const showLocation = computed(() => isAuthenticated.value || !!localLocation.value);
-const titleDisplayText = computed(() => localTitle.value || (isAuthenticated.value ? 'Add title' : ''));
-const locationDisplayText = computed(() => localLocation.value || (isAuthenticated.value ? 'Add location' : ''));
+const showTitle = computed(() => isSuperuser.value || !!localTitle.value);
+const showLocation = computed(() => isSuperuser.value || !!localLocation.value);
+const titleDisplayText = computed(() => localTitle.value || (isSuperuser.value ? 'Add title' : ''));
+const locationDisplayText = computed(() => localLocation.value || (isSuperuser.value ? 'Add location' : ''));
 
 // Get current photo index
 const currentIndex = computed(() => {
@@ -332,21 +333,21 @@ const syncEditableFields = () => {
 };
 
 const startTitleEdit = async () => {
-  if (!isAuthenticated.value) return;
+  if (!isSuperuser.value) return;
   isEditingTitle.value = true;
   pendingTitle.value = localTitle.value;
   await nextTick();
 };
 
 const startLocationEdit = async () => {
-  if (!isAuthenticated.value) return;
+  if (!isSuperuser.value) return;
   isEditingLocation.value = true;
   pendingLocation.value = localLocation.value;
   await nextTick();
 };
 
 const queueTitleSave = () => {
-  if (!isAuthenticated.value || !props.photo?.id) return;
+  if (!isSuperuser.value || !props.photo?.id) return;
   clearTimeout(titleSaveTimer.value);
   const photoId = props.photo.id;
   titleSaveTimer.value = setTimeout(async () => {
@@ -364,7 +365,7 @@ const queueTitleSave = () => {
 };
 
 const queueLocationSave = () => {
-  if (!isAuthenticated.value || !props.photo?.id) return;
+  if (!isSuperuser.value || !props.photo?.id) return;
   clearTimeout(locationSaveTimer.value);
   const photoId = props.photo.id;
   locationSaveTimer.value = setTimeout(async () => {
@@ -429,7 +430,7 @@ const loadPhotoDetails = async () => {
 };
 
 const addTag = async () => {
-  if (!isAuthenticated.value) return;
+  if (!isSuperuser.value) return;
   const name = tagInput.value.trim().toLowerCase();
   if (!name) return;
   const safeName = name.replace(/"/g, '\\"');
@@ -460,7 +461,7 @@ const addTag = async () => {
 };
 
 const removeTag = async (tag) => {
-  if (!isAuthenticated.value) return;
+  if (!isSuperuser.value) return;
   try {
     const updatedTags = tags.value.filter(existing => existing.id !== tag.id);
     await pb.collection(GALLERY_COLLECTIONS.photos).update(props.photo.id, {

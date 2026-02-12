@@ -2357,9 +2357,10 @@ routerAdd("POST", "/api/modules/{slug}/config", (e) => {
   m.setCORSHeaders(e);
   try {
     try {
-      m.requireAuth(e);
+      m.requireSuperuser(e);
     } catch (authError) {
-      return e.json(401, { error: authError.message || "Unauthorized" });
+      const status = authError?.status === 403 ? 403 : 401;
+      return e.json(status, { error: authError.message || (status === 403 ? "Forbidden: superuser access required" : "Unauthorized") });
     }
 
     const slug = e.request.pathValue("slug");
@@ -2395,9 +2396,10 @@ routerAdd("POST", "/api/modules/{slug}/install", (e) => {
   m.setCORSHeaders(e);
   try {
     try {
-      m.requireAuth(e);
+      m.requireSuperuser(e);
     } catch (authError) {
-      return e.json(401, { error: authError.message || "Unauthorized" });
+      const status = authError?.status === 403 ? 403 : 401;
+      return e.json(status, { error: authError.message || (status === 403 ? "Forbidden: superuser access required" : "Unauthorized") });
     }
     const slug = e.request.pathValue("slug");
 
@@ -2432,9 +2434,10 @@ routerAdd("POST", "/api/modules/{slug}/uninstall", (e) => {
   m.setCORSHeaders(e);
   try {
     try {
-      m.requireAuth(e);
+      m.requireSuperuser(e);
     } catch (authError) {
-      return e.json(401, { error: authError.message || "Unauthorized" });
+      const status = authError?.status === 403 ? 403 : 401;
+      return e.json(status, { error: authError.message || (status === 403 ? "Forbidden: superuser access required" : "Unauthorized") });
     }
     const slug = e.request.pathValue("slug");
 
@@ -2470,9 +2473,10 @@ routerAdd("POST", "/api/modules/{slug}/set-main", (e) => {
   m.setCORSHeaders(e);
   try {
     try {
-      m.requireAuth(e);
+      m.requireSuperuser(e);
     } catch (authError) {
-      return e.json(401, { error: authError.message || "Unauthorized" });
+      const status = authError?.status === 403 ? 403 : 401;
+      return e.json(status, { error: authError.message || (status === 403 ? "Forbidden: superuser access required" : "Unauthorized") });
     }
     const slug = e.request.pathValue("slug");
 
@@ -2506,9 +2510,10 @@ routerAdd("POST", "/api/modules/{slug}/unset-main", (e) => {
   m.setCORSHeaders(e);
   try {
     try {
-      m.requireAuth(e);
+      m.requireSuperuser(e);
     } catch (authError) {
-      return e.json(401, { error: authError.message || "Unauthorized" });
+      const status = authError?.status === 403 ? 403 : 401;
+      return e.json(status, { error: authError.message || (status === 403 ? "Forbidden: superuser access required" : "Unauthorized") });
     }
     const slug = e.request.pathValue("slug");
 

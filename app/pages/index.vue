@@ -4,6 +4,7 @@ definePageMeta({
 });
 
 const { modules, refreshModules } = useModules();
+const { isSuperuser } = usePermissions();
 const loading = ref(true);
 
 const isLearnMain = computed(() => {
@@ -36,7 +37,7 @@ onMounted(async () => {
             Select a main module in management to make it render at the root path.
           </p>
 
-          <div class="mt-6">
+          <div v-if="isSuperuser" class="mt-6">
             <a
               href="/modules"
               class="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"

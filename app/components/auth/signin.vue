@@ -49,6 +49,10 @@
         {{ isSignIn ? "Don't have an account?" : "Already have an account?" }}
         <a @click="toggleAuthMode" class="text-purple-500 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 cursor-pointer">{{ isSignIn ? 'Sign Up' : 'Sign In' }}</a>
       </p>
+      <p v-if="isSignIn" class="mt-2 text-gray-600 dark:text-slate-300 text-center text-sm">
+        Superuser?
+        <a href="/admin" class="text-primary font-bold">Use admin login</a>
+      </p>
     </div>
   </div>
 </template>

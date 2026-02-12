@@ -1,6 +1,7 @@
 <script setup>
 import { pb } from '#imports';
 import { GALLERY_COLLECTIONS } from '~/utils/collections';
+import { authUtils } from '~/utils/auth';
 import { alertController } from '@ionic/vue';
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -16,7 +17,7 @@ const saveTimer = ref(null);
 
 const galleryRef = ref(null);
 const { showUpload, selectionMode, currentLayout } = useGalleryState();
-const isAuthenticated = computed(() => pb.authStore.isValid);
+const isSuperuser = computed(() => authUtils.isSuperuser());
 const isDeleting = ref(false);
 const { toGalleryPath } = useGalleryRoutes();
 
@@ -38,14 +39,14 @@ const fetchAlbum = async () => {
 };
 
 const startTitleEdit = async () => {
-  if (!isAuthenticated.value) return;
+  if (!isSuperuser.value) return;
   isEditingTitle.value = true;
   pendingTitle.value = album.value?.title || '';
   await nextTick();
 };
 
 const queueTitleSave = () => {
-  if (!isAuthenticated.value) return;
+  if (!isSuperuser.value) return;
   if (!album.value) return;
   clearTimeout(saveTimer.value);
   saveTimer.value = setTimeout(async () => {
@@ -108,6 +109,7 @@ const toggleAllGroups = () => {
 };
 
 const deleteAlbum = async () => {
+  if (!isSuperuser.value) return;
   if (!album.value || isDeleting.value) return;
 
   const alert = await alertController.create({
@@ -199,7 +201,7 @@ watch(pendingTitle, () => {
                 <h1
                   v-if="!isEditingTitle"
                   class="text-2xl font-bold text-gray-800"
-                  :class="isAuthenticated ? 'cursor-pointer hover:text-gray-900' : ''"
+                  :class="isSuperuser ? 'cursor-pointer hover:text-gray-900' : ''"
                   @click="startTitleEdit"
                 >
                   {{ album?.title || '' }}
@@ -229,7 +231,7 @@ watch(pendingTitle, () => {
                 <Icon :name="areAllGroupsExpanded ? 'lucide:fold-horizontal' : 'lucide:unfold-horizontal'" class="text-lg" />
               </button>
               <button
-                v-if="isAuthenticated"
+                v-if="isSuperuser"
                 @click="deleteAlbum"
                 :disabled="isDeleting"
                 class="bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors flex items-center gap-2"

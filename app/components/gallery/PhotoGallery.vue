@@ -54,7 +54,7 @@
 
       <!-- Set Location Button -->
       <button
-        v-if="isAuthenticated && selectedPhotos.length > 0"
+        v-if="isSuperuser && selectedPhotos.length > 0"
         @click="promptSetLocation"
         class="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors duration-200 flex items-center gap-2"
       >
@@ -139,7 +139,7 @@
           class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4"
         >
           <button
-            v-if="pb.authStore.isValid"
+            v-if="isSuperuser"
             @click.stop="toggleFavorite(item)"
             class="absolute top-3 right-12 bg-black/60 hover:bg-black/75 text-white rounded-full p-2 transition-colors duration-200"
             :title="isFavorited(item) ? 'Unfavorite' : 'Favorite'"
@@ -165,7 +165,7 @@
           class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4"
         >
           <button
-            v-if="pb.authStore.isValid"
+            v-if="isSuperuser"
             @click.stop="toggleFavorite(item)"
             class="absolute top-3 right-3 bg-black/60 hover:bg-black/75 text-white rounded-full p-2 transition-colors duration-200"
             :title="isFavorited(item) ? 'Unfavorite' : 'Favorite'"
@@ -288,6 +288,7 @@
 <script setup>
 import { pb } from '#imports';
 import { GALLERY_COLLECTIONS } from '~/utils/collections';
+import { authUtils } from '~/utils/auth';
 import { alertController } from '@ionic/vue';
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import exifr from 'exifr';
@@ -332,7 +333,7 @@ const expandedGroupsBeforeSelection = ref(new Set()); // Track expanded groups w
 const gridLayout = ref(null); // Ref to the grid layout component
 const replaceInput = ref(null);
 const replacing = ref(false);
-const isAuthenticated = computed(() => pb.authStore.isValid);
+const isSuperuser = computed(() => authUtils.isSuperuser());
 const groupCount = computed(() => groups.value.length);
 const areAllGroupsExpanded = computed(() => {
   return groupCount.value > 0 && expandedGroups.value.size === groupCount.value;
@@ -397,7 +398,7 @@ const setGroupPhotoSortOrder = (groupId, photoId, sortOrder) => {
 
 
 const ensureSortOrder = async (items) => {
-  if (!pb.authStore.isValid) return;
+  if (!isSuperuser.value) return;
   const missing = items.filter(item => typeof item.sortOrder !== 'number');
   if (missing.length === 0) return;
 
@@ -442,7 +443,7 @@ const ensureSortOrder = async (items) => {
 };
 
 const ensureGroupPhotoSortOrder = async () => {
-  if (!pb.authStore.isValid) return;
+  if (!isSuperuser.value) return;
   const step = 1000;
   const updates = [];
 
@@ -818,7 +819,7 @@ const isFavorited = (item) => {
 };
 
 const toggleFavorite = async (item) => {
-  if (!pb.authStore.isValid || !pb.authStore.record?.id) return;
+  if (!isSuperuser.value) return;
 
   const currentFavorite = item.isGroup ? (item.group?.favorite ?? item.favorite ?? false) : (item.favorite ?? false);
   const nextFavorite = !currentFavorite;
@@ -957,6 +958,7 @@ const togglePhotoSelection = (payload) => {
 };
 
 const reorderItems = async ({ sourceId, targetId, groupId }) => {
+  if (!isSuperuser.value) return;
   if (!props.selectionMode) return;
   if (!sourceId || !targetId || sourceId === targetId) return;
 
@@ -1171,6 +1173,7 @@ const extractMetadata = async (file) => {
 };
 
 const triggerReplace = () => {
+  if (!isSuperuser.value) return;
   if (replacing.value) return;
   if (!replaceInput.value) return;
   replaceInput.value.click();
@@ -1186,7 +1189,7 @@ const handleReplaceSelect = async (event) => {
 const replaceSelectedPhoto = async (file) => {
   const target = selectedPhotosData.value[0];
   if (!target?.id) return;
-  if (!pb.authStore.isValid) return;
+  if (!isSuperuser.value) return;
 
   replacing.value = true;
   try {
@@ -1231,6 +1234,7 @@ const replaceSelectedPhoto = async (file) => {
 };
 
 const createQuickGroup = async () => {
+  if (!isSuperuser.value) return;
   if (selectedPhotosData.value.length < 2) return;
   const currentUser = pb.authStore.record;
   if (!currentUser) return;
@@ -1374,6 +1378,7 @@ const toggleGroupExpansion = async (groupId) => {
 
 // Confirm delete with Ionic alert
 const confirmDelete = async (photo) => {
+  if (!isSuperuser.value) return;
   const alert = await alertController.create({
     header: 'Delete Photo',
     message: `Are you sure you want to delete ${photo.title || 'this photo'}?`,
@@ -1394,6 +1399,7 @@ const confirmDelete = async (photo) => {
 
 // Delete photo
 const deletePhoto = async (photo) => {
+  if (!isSuperuser.value) return;
   try {
     let groupToCheck = null;
     
@@ -1462,6 +1468,7 @@ const deletePhoto = async (photo) => {
 
 // Confirm delete selected photos
 const confirmDeleteSelected = async () => {
+  if (!isSuperuser.value) return;
   if (selectedPhotos.value.length === 0) return;
   
   const photoCount = selectedPhotos.value.length;
@@ -1484,7 +1491,7 @@ const confirmDeleteSelected = async () => {
 };
 
 const promptSetLocation = async () => {
-  if (!isAuthenticated.value || selectedPhotos.value.length === 0) return;
+  if (!isSuperuser.value || selectedPhotos.value.length === 0) return;
 
   const photoCount = selectedPhotos.value.length;
   const alert = await alertController.create({
@@ -1516,7 +1523,7 @@ const promptSetLocation = async () => {
 };
 
 const updateSelectedLocations = async (location) => {
-  if (!isAuthenticated.value || selectedPhotos.value.length === 0) return;
+  if (!isSuperuser.value || selectedPhotos.value.length === 0) return;
 
   const photoIds = [...new Set(selectedPhotos.value)];
   try {
@@ -1548,6 +1555,7 @@ const updateSelectedLocations = async (location) => {
 
 // Delete multiple selected photos
 const deleteSelectedPhotos = async () => {
+  if (!isSuperuser.value) return;
   if (selectedPhotos.value.length === 0) return;
   
   try {
@@ -1632,6 +1640,7 @@ const deleteSelectedPhotos = async () => {
 
 // Add photos to group (Edit Mode)
 const addPhotosToGroup = async () => {
+  if (!isSuperuser.value) return;
   if (!isEditMode.value || !currentExpandedGroupId.value || selectedPhotos.value.length === 0) {
     return;
   }
@@ -1670,6 +1679,7 @@ const addPhotosToGroup = async () => {
 
 // Remove photos from group (Edit Mode)
 const removePhotosFromGroup = async () => {
+  if (!isSuperuser.value) return;
   if (!isEditMode.value || !currentExpandedGroupId.value || selectedPhotos.value.length === 0) {
     return;
   }
@@ -1769,6 +1779,7 @@ const removePhotosFromGroup = async () => {
 
 // Confirm delete group
 const confirmDeleteGroup = async () => {
+  if (!isSuperuser.value) return;
   if (!isEditMode.value || !currentExpandedGroupId.value) return;
   
   const group = groups.value.find(g => g.id === currentExpandedGroupId.value);
@@ -1794,6 +1805,7 @@ const confirmDeleteGroup = async () => {
 
 // Delete group (removes all photos from group and deletes the group)
 const deleteGroup = async () => {
+  if (!isSuperuser.value) return;
   if (!isEditMode.value || !currentExpandedGroupId.value) return;
   
   try {
