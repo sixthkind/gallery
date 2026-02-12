@@ -11,11 +11,29 @@ const slug = computed(() => String(route.params.slug || "").trim());
 const loading = ref(true);
 const product = ref<any | null>(null);
 const photos = ref<any[]>([]);
+const activePhotoIndex = ref(0);
 const productTags = ref<any[]>([]);
 const productTagInput = ref("");
 const selectedPhoto = ref<any | null>(null);
 const isSuperuser = computed(() => authUtils.isSuperuser());
 const allPhotosForLightbox = computed(() => photos.value);
+const activePhoto = computed(() => photos.value[activePhotoIndex.value] || null);
+
+const getPhotoDateValue = (photo: any) => {
+  const value = photo?.dateTaken || photo?.created || 0;
+  return new Date(value).getTime();
+};
+
+const sortPhotosLikeMerchGroup = (items: any[]) => {
+  return [...items].sort((a, b) => {
+    const aOrder = typeof a?.sortOrder === "number" ? a.sortOrder : null;
+    const bOrder = typeof b?.sortOrder === "number" ? b.sortOrder : null;
+    if (aOrder !== null && bOrder !== null) return aOrder - bOrder;
+    if (aOrder !== null) return -1;
+    if (bOrder !== null) return 1;
+    return getPhotoDateValue(b) - getPhotoDateValue(a);
+  });
+};
 const isProductDetailPath = () => {
   const path = String(route.path || "");
   return path.startsWith("/products/") || path.startsWith("/merch/products/");
@@ -25,6 +43,7 @@ const fetchProduct = async () => {
   loading.value = true;
   product.value = null;
   photos.value = [];
+  activePhotoIndex.value = 0;
   productTags.value = [];
   productTagInput.value = "";
   selectedPhoto.value = null;
@@ -45,8 +64,11 @@ const fetchProduct = async () => {
     });
     product.value = record;
 
-    const productPhotos = Array.isArray(record.expand?.photos) ? record.expand.photos : [];
+    const productPhotos = Array.isArray(record.expand?.photos)
+      ? sortPhotosLikeMerchGroup(record.expand.photos)
+      : [];
     photos.value = productPhotos;
+    activePhotoIndex.value = 0;
     productTags.value = Array.isArray(record.expand?.tags) ? record.expand.tags : [];
   } catch (error) {
     if (isProductDetailPath()) {
@@ -57,8 +79,41 @@ const fetchProduct = async () => {
   }
 };
 
-const getPhotoUrl = (photo: any) => {
-  return pb.files.getURL(photo, photo.photo, { thumb: "500x500" });
+const getLargePhotoUrl = (photo: any) => {
+  return pb.files.getURL(photo, photo.photo, { thumb: "1600x0" });
+};
+
+const getThumbnailPhotoUrl = (photo: any) => {
+  return pb.files.getURL(photo, photo.photo, { thumb: "0x500" });
+};
+
+const photoTileStyle = (photo: any) => {
+  const width = Number(photo?.width || 0);
+  const height = Number(photo?.height || 0);
+  if (width > 0 && height > 0) {
+    return { aspectRatio: `${width} / ${height}` };
+  }
+  return { aspectRatio: "1 / 1" };
+};
+
+const selectPhoto = (index: number) => {
+  if (index < 0 || index >= photos.value.length) return;
+  activePhotoIndex.value = index;
+};
+
+const showPreviousPhoto = () => {
+  if (photos.value.length < 2) return;
+  activePhotoIndex.value = (activePhotoIndex.value - 1 + photos.value.length) % photos.value.length;
+};
+
+const showNextPhoto = () => {
+  if (photos.value.length < 2) return;
+  activePhotoIndex.value = (activePhotoIndex.value + 1) % photos.value.length;
+};
+
+const openActivePhotoLightbox = () => {
+  if (!activePhoto.value) return;
+  selectedPhoto.value = activePhoto.value;
 };
 
 const openProductTag = async (tag: any) => {
@@ -124,10 +179,6 @@ const removeProductTag = async (tag: any) => {
   }
 };
 
-const openLightbox = (photo: any) => {
-  selectedPhoto.value = photo;
-};
-
 const closeLightbox = () => {
   selectedPhoto.value = null;
 };
@@ -144,12 +195,13 @@ const navigateLightbox = (direction: "next" | "prev") => {
       ? (currentIndex + 1) % allPhotosForLightbox.value.length
       : (currentIndex - 1 + allPhotosForLightbox.value.length) % allPhotosForLightbox.value.length;
 
+  activePhotoIndex.value = nextIndex;
   selectedPhoto.value = allPhotosForLightbox.value[nextIndex];
 };
 
 const handleTagsUpdated = ({ photoId, tags }: { photoId: string; tags: any[] }) => {
   const tagIds = tags.map((tag) => tag.id);
-  photos.value = photos.value.map((photo) => {
+  const updatedPhotos = photos.value.map((photo) => {
     if (photo.id !== photoId) return photo;
     return {
       ...photo,
@@ -160,6 +212,7 @@ const handleTagsUpdated = ({ photoId, tags }: { photoId: string; tags: any[] }) 
       }
     };
   });
+  photos.value = sortPhotosLikeMerchGroup(updatedPhotos);
 
   if (selectedPhoto.value?.id === photoId) {
     selectedPhoto.value = {
@@ -206,81 +259,133 @@ watch(slug, (nextSlug, previousSlug) => {
             </NuxtLink>
           </div>
 
-          <h1 class="text-3xl font-bold text-slate-800 dark:text-slate-100">{{ product.name || "Untitled Product" }}</h1>
-          <p class="mt-2 text-sm text-slate-500 dark:text-slate-300">Slug: {{ product.slug }}</p>
-          <p class="mt-2 text-lg font-semibold text-slate-700 dark:text-slate-200">
-            ${{ typeof product.price === "number" ? product.price.toFixed(2) : "0.00" }} {{ (product.currency || "USD").toUpperCase() }}
-          </p>
-          <p class="mt-2 text-sm" :class="product.active ? 'text-emerald-600' : 'text-slate-500'">
-            {{ product.active ? "Active" : "Inactive" }}
-          </p>
+          <div class="lg:grid lg:grid-cols-2 lg:gap-10 lg:items-start">
+            <div>
+              <h1 class="text-3xl font-bold text-slate-800 dark:text-slate-100">{{ product.name || "Untitled Product" }}</h1>
+              <p class="mt-2 text-lg font-semibold text-slate-700 dark:text-slate-200">
+                ${{ typeof product.price === "number" ? product.price.toFixed(2) : "0.00" }} {{ (product.currency || "USD").toUpperCase() }}
+              </p>
+              <p class="mt-2 text-sm" :class="product.active ? 'text-emerald-600' : 'text-slate-500'">
+                {{ product.active ? "Active" : "Inactive" }}
+              </p>
 
-          <div class="mt-5">
-            <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Tags</h2>
-            <div class="mt-2 flex flex-wrap items-center gap-2">
-              <div
-                v-for="tag in productTags"
-                :key="tag.id"
-                class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              >
-                <button
-                  type="button"
-                  class="hover:text-slate-900 dark:hover:text-white"
-                  @click="openProductTag(tag)"
-                >
-                  #{{ tag.name }}
-                </button>
-                <button
-                  v-if="isSuperuser"
-                  type="button"
-                  class="text-slate-400 hover:text-red-500"
-                  aria-label="Remove tag"
-                  @click="removeProductTag(tag)"
-                >
-                  <Icon name="heroicons:x-mark" class="text-sm" />
-                </button>
+              <div class="mt-5">
+                <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Tags</h2>
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                  <div
+                    v-for="tag in productTags"
+                    :key="tag.id"
+                    class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    <button
+                      type="button"
+                      class="hover:text-slate-900 dark:hover:text-white"
+                      @click="openProductTag(tag)"
+                    >
+                      #{{ tag.name }}
+                    </button>
+                    <button
+                      v-if="isSuperuser"
+                      type="button"
+                      class="text-slate-400 hover:text-red-500"
+                      aria-label="Remove tag"
+                      @click="removeProductTag(tag)"
+                    >
+                      <Icon name="heroicons:x-mark" class="text-sm" />
+                    </button>
+                  </div>
+                  <span v-if="!productTags.length" class="text-sm text-slate-500">No tags</span>
+                </div>
+
+                <div v-if="isSuperuser" class="mt-3 flex items-center gap-2">
+                  <input
+                    v-model="productTagInput"
+                    type="text"
+                    maxlength="50"
+                    placeholder="Add tag"
+                    class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+                    @keydown.enter.prevent="addProductTag"
+                  />
+                  <button
+                    type="button"
+                    class="rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white"
+                    @click="addProductTag"
+                  >
+                    Add
+                  </button>
+                </div>
               </div>
-              <span v-if="!productTags.length" class="text-sm text-slate-500">No tags</span>
+
+              <p v-if="product.shortDescription" class="mt-4 text-slate-700 dark:text-slate-300">
+                {{ product.shortDescription }}
+              </p>
+
+              <div v-if="product.details" class="prose prose-slate mt-4 max-w-none dark:prose-invert" v-html="product.details"></div>
             </div>
 
-            <div v-if="isSuperuser" class="mt-3 flex items-center gap-2">
-              <input
-                v-model="productTagInput"
-                type="text"
-                maxlength="50"
-                placeholder="Add tag"
-                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
-                @keydown.enter.prevent="addProductTag"
-              />
-              <button
-                type="button"
-                class="rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white"
-                @click="addProductTag"
-              >
-                Add
-              </button>
-            </div>
-          </div>
+            <div class="mt-8 lg:mt-0">
+              <div v-if="photos.length === 0" class="mt-3 text-slate-500">No photos assigned to this product.</div>
+              <div v-else class="mt-3">
+                <div class="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-900/40">
+                  <button
+                    type="button"
+                    class="block h-[28rem] w-full p-3 sm:h-[32rem]"
+                    @click="openActivePhotoLightbox"
+                  >
+                    <img
+                      v-if="activePhoto"
+                      :src="getLargePhotoUrl(activePhoto)"
+                      :alt="activePhoto.title || 'Photo'"
+                      class="h-full w-full object-contain"
+                      loading="lazy"
+                    />
+                  </button>
 
-          <p v-if="product.shortDescription" class="mt-4 text-slate-700 dark:text-slate-300">
-            {{ product.shortDescription }}
-          </p>
+                  <button
+                    v-if="photos.length > 1"
+                    type="button"
+                    class="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/75"
+                    aria-label="Previous image"
+                    @click.stop="showPreviousPhoto"
+                  >
+                    <Icon name="heroicons:chevron-left" class="text-2xl leading-none" />
+                  </button>
 
-          <div v-if="product.details" class="prose prose-slate mt-4 max-w-none dark:prose-invert" v-html="product.details"></div>
+                  <button
+                    v-if="photos.length > 1"
+                    type="button"
+                    class="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-black/75"
+                    aria-label="Next image"
+                    @click.stop="showNextPhoto"
+                  >
+                    <Icon name="heroicons:chevron-right" class="text-2xl leading-none" />
+                  </button>
+                </div>
 
-          <div class="mt-8">
-            <h2 class="text-xl font-semibold text-slate-800 dark:text-slate-100">Photos</h2>
-            <div v-if="photos.length === 0" class="mt-3 text-slate-500">No photos assigned to this product.</div>
-            <div v-else class="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-              <button
-                v-for="photo in photos"
-                :key="photo.id"
-                type="button"
-                @click="openLightbox(photo)"
-                class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-slate-700 dark:bg-slate-900/40"
-              >
-                <img :src="getPhotoUrl(photo)" :alt="photo.title || 'Photo'" class="h-40 w-full object-contain bg-slate-100 dark:bg-slate-900/40" loading="lazy" />
-              </button>
+                <div class="mt-3 flex flex-wrap items-start gap-2">
+                  <button
+                    v-for="(photo, index) in photos"
+                    :key="photo.id"
+                    type="button"
+                    :style="photoTileStyle(photo)"
+                    :class="[
+                      'h-20 overflow-hidden rounded-md border-2 bg-slate-100 transition-shadow dark:bg-slate-900/40',
+                      index === activePhotoIndex
+                        ? 'border-white shadow-[0_0_0_1px_rgba(100,116,139,0.8)]'
+                        : 'border-transparent hover:border-slate-300 dark:hover:border-slate-500'
+                    ]"
+                    :aria-label="`View image ${index + 1}`"
+                    @click="selectPhoto(index)"
+                  >
+                    <img
+                      :src="getThumbnailPhotoUrl(photo)"
+                      :alt="photo.title || 'Photo'"
+                      class="h-full w-full object-contain"
+                      loading="lazy"
+                    />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
