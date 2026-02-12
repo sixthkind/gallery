@@ -2313,6 +2313,7 @@ routerAdd("GET", "/api/modules", (e) => {
       isMain: !!record.get("isMain"),
       routeBase: record.get("routeBase"),
       collectionPrefix: record.get("collectionPrefix"),
+      config: record.get("config") || {},
       created: record.get("created"),
       updated: record.get("updated")
     }));
@@ -2320,6 +2321,72 @@ routerAdd("GET", "/api/modules", (e) => {
     return e.json(200, { modules });
   } catch (error) {
     return e.json(500, { error: error.message || "Failed to list modules" });
+  }
+});
+
+routerAdd("GET", "/api/modules/{slug}/config", (e) => {
+  const m = require(`${__hooks}/utils/modules.js`);
+  m.setCORSHeaders(e);
+  try {
+    try {
+      m.requireAuth(e);
+    } catch (authError) {
+      return e.json(401, { error: authError.message || "Unauthorized" });
+    }
+
+    const slug = e.request.pathValue("slug");
+    if (!m.isSupportedModuleSlug(slug)) {
+      return e.json(400, { error: "Unknown module slug" });
+    }
+
+    const moduleRecord = m.getOrCreateModuleRecord(slug);
+    const config = m.ensureModuleConfigDefaults(moduleRecord, slug);
+    return e.json(200, {
+      slug,
+      config
+    });
+  } catch (error) {
+    const message = error.message || "Failed to get module config";
+    const status = /auth|token|authorization/i.test(message) ? 401 : 400;
+    return e.json(status, { error: message });
+  }
+});
+
+routerAdd("POST", "/api/modules/{slug}/config", (e) => {
+  const m = require(`${__hooks}/utils/modules.js`);
+  m.setCORSHeaders(e);
+  try {
+    try {
+      m.requireAuth(e);
+    } catch (authError) {
+      return e.json(401, { error: authError.message || "Unauthorized" });
+    }
+
+    const slug = e.request.pathValue("slug");
+    if (!m.isSupportedModuleSlug(slug)) {
+      return e.json(400, { error: "Unknown module slug" });
+    }
+
+    const data = new DynamicModel({
+      config: {}
+    });
+    e.bindBody(data);
+
+    if (!data.config || typeof data.config !== "object" || Array.isArray(data.config)) {
+      return e.json(400, { error: "Invalid config payload" });
+    }
+
+    const moduleRecord = m.getOrCreateModuleRecord(slug);
+    const config = m.updateModuleConfig(moduleRecord, slug, data.config);
+
+    return e.json(200, {
+      slug,
+      config
+    });
+  } catch (error) {
+    const message = error.message || "Failed to update module config";
+    const status = /auth|token|authorization/i.test(message) ? 401 : 400;
+    return e.json(status, { error: message });
   }
 });
 
@@ -2334,12 +2401,13 @@ routerAdd("POST", "/api/modules/{slug}/install", (e) => {
     }
     const slug = e.request.pathValue("slug");
 
-    if (slug !== m.MODULE_SLUG_GALLERY && slug !== m.MODULE_SLUG_LEARN) {
+    if (!m.isSupportedModuleSlug(slug)) {
       return e.json(400, { error: "Unknown module slug" });
     }
 
     const moduleRecord = m.getOrCreateModuleRecord(slug);
     m.ensureCollectionsForModule(slug);
+    const config = m.ensureModuleConfigDefaults(moduleRecord, slug);
 
     if (!moduleRecord.get("installed")) {
       moduleRecord.set("installed", true);
@@ -2349,7 +2417,8 @@ routerAdd("POST", "/api/modules/{slug}/install", (e) => {
     return e.json(200, {
       slug,
       installed: true,
-      isMain: !!moduleRecord.get("isMain")
+      isMain: !!moduleRecord.get("isMain"),
+      config
     });
   } catch (error) {
     const message = error.message || "Failed to install module";
@@ -2369,7 +2438,7 @@ routerAdd("POST", "/api/modules/{slug}/uninstall", (e) => {
     }
     const slug = e.request.pathValue("slug");
 
-    if (slug !== m.MODULE_SLUG_GALLERY && slug !== m.MODULE_SLUG_LEARN) {
+    if (!m.isSupportedModuleSlug(slug)) {
       return e.json(400, { error: "Unknown module slug" });
     }
 
@@ -2407,7 +2476,7 @@ routerAdd("POST", "/api/modules/{slug}/set-main", (e) => {
     }
     const slug = e.request.pathValue("slug");
 
-    if (slug !== m.MODULE_SLUG_GALLERY && slug !== m.MODULE_SLUG_LEARN) {
+    if (!m.isSupportedModuleSlug(slug)) {
       return e.json(400, { error: "Unknown module slug" });
     }
 
@@ -2443,7 +2512,7 @@ routerAdd("POST", "/api/modules/{slug}/unset-main", (e) => {
     }
     const slug = e.request.pathValue("slug");
 
-    if (slug !== m.MODULE_SLUG_GALLERY && slug !== m.MODULE_SLUG_LEARN) {
+    if (!m.isSupportedModuleSlug(slug)) {
       return e.json(400, { error: "Unknown module slug" });
     }
 

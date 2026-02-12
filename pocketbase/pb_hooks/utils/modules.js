@@ -4,6 +4,7 @@ const MODULE_SLUG_GALLERY = "gallery";
 const MODULE_SLUG_LEARN = "learn";
 const COLLECTION_MODULES = "modules";
 const MODULES_COLLECTION_ID = "pbc_5550000001";
+const MODULE_CONFIG_FIELD_ID = "jsonmod00000008";
 
 const GALLERY_TAGS_ID = "pbc_1219621782";
 const GALLERY_PHOTOS_ID = "pbc_1234567890";
@@ -32,6 +33,33 @@ const LEARN_LESSON_PROGRESS = "_learn_lesson_progress";
 const LEARN_MODULES = "_learn_modules";
 const LEARN_SUBSCRIPTION_TIERS = "_learn_subscription_tiers";
 const LEARN_STRIPE_CONFIG = "_learn_stripe_config";
+
+const DEFAULT_MODULE_CONFIGS = {
+  [MODULE_SLUG_GALLERY]: {
+    navbar: {
+      titleText: "Gallery",
+      buttons: [
+        { title: "Albums", path: "/albums", icon: "heroicons:rectangle-stack" },
+        { title: "Tags", path: "/tags", icon: "heroicons:tag" }
+      ]
+    },
+    settings: {
+      titleEditable: true
+    }
+  },
+  [MODULE_SLUG_LEARN]: {
+    navbar: {
+      titleText: "Learn",
+      buttons: [
+        { title: "Courses", path: "/courses", icon: "heroicons:book-open" },
+        { title: "Enrollments", path: "/enrollments", icon: "heroicons:bookmark-square", requiresAuth: true }
+      ]
+    },
+    settings: {
+      titleEditable: true
+    }
+  }
+};
 
 function setCORSHeaders(e) {
   e.response.header().set("Access-Control-Allow-Origin", "*");
@@ -68,6 +96,117 @@ function hasAllLearnCollections() {
     findCollectionSafe(LEARN_SUBSCRIPTION_TIERS) &&
     findCollectionSafe(LEARN_STRIPE_CONFIG)
   );
+}
+
+function isSupportedModuleSlug(slug) {
+  return slug === MODULE_SLUG_GALLERY || slug === MODULE_SLUG_LEARN;
+}
+
+function cloneJSON(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function getDefaultModuleConfig(slug) {
+  return cloneJSON(DEFAULT_MODULE_CONFIGS[slug] || {
+    navbar: { titleText: "", buttons: [] },
+    settings: { titleEditable: false }
+  });
+}
+
+function normalizeModuleButton(button) {
+  if (!button || typeof button !== "object") return null;
+
+  const title = typeof button.title === "string" ? button.title.trim() : "";
+  const rawPath = typeof button.path === "string" ? button.path.trim() : "";
+  if (!title || !rawPath) {
+    return null;
+  }
+
+  const normalizedPath = rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
+  if (normalizedPath === "/") {
+    return null;
+  }
+  const normalized = { title, path: normalizedPath };
+
+  if (typeof button.icon === "string" && button.icon.trim()) {
+    normalized.icon = button.icon.trim();
+  }
+  if (button.requiresAuth === true) {
+    normalized.requiresAuth = true;
+  }
+
+  return normalized;
+}
+
+function normalizeModuleConfig(slug, rawConfig) {
+  const defaults = getDefaultModuleConfig(slug);
+  const source = rawConfig && typeof rawConfig === "object" ? rawConfig : {};
+  const sourceNavbar = source.navbar && typeof source.navbar === "object" ? source.navbar : {};
+  const sourceSettings = source.settings && typeof source.settings === "object" ? source.settings : {};
+
+  const titleText = typeof sourceNavbar.titleText === "string" && sourceNavbar.titleText.trim()
+    ? sourceNavbar.titleText.trim()
+    : defaults.navbar.titleText;
+
+  const sourceButtons = Array.isArray(sourceNavbar.buttons) && sourceNavbar.buttons.length > 0
+    ? sourceNavbar.buttons
+    : defaults.navbar.buttons;
+  const normalizedButtons = sourceButtons
+    .map(normalizeModuleButton)
+    .filter((button) => !!button);
+  const buttons = normalizedButtons.length > 0
+    ? normalizedButtons
+    : defaults.navbar.buttons.map(normalizeModuleButton).filter((button) => !!button);
+
+  return {
+    navbar: {
+      titleText,
+      buttons
+    },
+    settings: {
+      titleEditable: sourceSettings.titleEditable === undefined
+        ? !!defaults.settings.titleEditable
+        : !!sourceSettings.titleEditable
+    }
+  };
+}
+
+function ensureModuleConfigDefaults(moduleRecord, slug) {
+  const currentConfig = moduleRecord.get("config");
+  const normalized = normalizeModuleConfig(slug, currentConfig);
+  const currentJSON = JSON.stringify(currentConfig || {});
+  const normalizedJSON = JSON.stringify(normalized);
+
+  if (currentJSON !== normalizedJSON) {
+    moduleRecord.set("config", normalized);
+    $app.save(moduleRecord);
+  }
+
+  return normalized;
+}
+
+function updateModuleConfig(moduleRecord, slug, configPatch) {
+  const current = normalizeModuleConfig(slug, moduleRecord.get("config"));
+  const patch = configPatch && typeof configPatch === "object" ? configPatch : {};
+  const patchNavbar = patch.navbar && typeof patch.navbar === "object" ? patch.navbar : {};
+  const patchSettings = patch.settings && typeof patch.settings === "object" ? patch.settings : {};
+
+  const merged = {
+    navbar: {
+      ...current.navbar,
+      ...(patchNavbar.titleText !== undefined ? { titleText: patchNavbar.titleText } : {}),
+      ...(patchNavbar.buttons !== undefined ? { buttons: patchNavbar.buttons } : {})
+    },
+    settings: {
+      ...current.settings,
+      ...(patchSettings.titleEditable !== undefined ? { titleEditable: patchSettings.titleEditable } : {})
+    }
+  };
+
+  const normalized = normalizeModuleConfig(slug, merged);
+  moduleRecord.set("config", normalized);
+  $app.save(moduleRecord);
+  return normalized;
 }
 
 function migrateLegacyGalleryNamesIfNeeded() {
@@ -159,6 +298,39 @@ function ensureInstalledFieldIsOptional(modulesCollection) {
       "required": false,
       "system": false,
       "type": "bool"
+    }));
+    $app.save(modulesCollection);
+  }
+}
+
+function ensureConfigField(modulesCollection) {
+  const configField = modulesCollection.fields.getByName("config");
+  if (!configField) {
+    modulesCollection.fields.addAt(8, new Field({
+      "hidden": false,
+      "id": MODULE_CONFIG_FIELD_ID,
+      "maxSize": 0,
+      "name": "config",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "json"
+    }));
+    $app.save(modulesCollection);
+    return;
+  }
+
+  if (configField.type !== "json") {
+    modulesCollection.fields.removeById(configField.id);
+    modulesCollection.fields.addAt(8, new Field({
+      "hidden": false,
+      "id": configField.id || MODULE_CONFIG_FIELD_ID,
+      "maxSize": 0,
+      "name": "config",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "json"
     }));
     $app.save(modulesCollection);
   }
@@ -283,6 +455,16 @@ function buildModulesCollection() {
       },
       {
         "hidden": false,
+        "id": MODULE_CONFIG_FIELD_ID,
+        "maxSize": 0,
+        "name": "config",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "json"
+      },
+      {
+        "hidden": false,
         "id": "autodate2990389176",
         "name": "created",
         "onCreate": true,
@@ -328,6 +510,7 @@ function ensureModulesCollectionAndSeed() {
   }
 
   ensureInstalledFieldIsOptional(modulesCollection);
+  ensureConfigField(modulesCollection);
 
   const moduleConfigs = [
     {
@@ -336,7 +519,8 @@ function ensureModulesCollectionAndSeed() {
       description: "Photo gallery module",
       routeBase: "/gallery",
       collectionPrefix: "gallery_",
-      installed: hasAllGalleryCollections()
+      installed: hasAllGalleryCollections(),
+      config: getDefaultModuleConfig(MODULE_SLUG_GALLERY)
     },
     {
       slug: MODULE_SLUG_LEARN,
@@ -344,7 +528,8 @@ function ensureModulesCollectionAndSeed() {
       description: "E-learning courses module",
       routeBase: "/learn",
       collectionPrefix: "_learn_",
-      installed: hasAllLearnCollections()
+      installed: hasAllLearnCollections(),
+      config: getDefaultModuleConfig(MODULE_SLUG_LEARN)
     }
   ];
 
@@ -360,6 +545,7 @@ function ensureModulesCollectionAndSeed() {
     moduleRecord.set("installed", config.installed);
     moduleRecord.set("routeBase", config.routeBase);
     moduleRecord.set("collectionPrefix", config.collectionPrefix);
+    moduleRecord.set("config", normalizeModuleConfig(config.slug, moduleRecord.get("config") || config.config));
     if (moduleRecord.get("isMain") === null || moduleRecord.get("isMain") === undefined) {
       moduleRecord.set("isMain", false);
     }
@@ -372,7 +558,10 @@ function ensureModulesCollectionAndSeed() {
 function getOrCreateModuleRecord(slug) {
   ensureModulesCollectionAndSeed();
   let moduleRecord = findModuleBySlugSafe(slug);
-  if (moduleRecord) return moduleRecord;
+  if (moduleRecord) {
+    ensureModuleConfigDefaults(moduleRecord, slug);
+    return moduleRecord;
+  }
 
   const configs = {
     [MODULE_SLUG_GALLERY]: {
@@ -380,14 +569,16 @@ function getOrCreateModuleRecord(slug) {
       description: "Photo gallery module",
       routeBase: "/gallery",
       collectionPrefix: "gallery_",
-      installed: hasAllGalleryCollections()
+      installed: hasAllGalleryCollections(),
+      config: getDefaultModuleConfig(MODULE_SLUG_GALLERY)
     },
     [MODULE_SLUG_LEARN]: {
       name: "Learn",
       description: "E-learning courses module",
       routeBase: "/learn",
       collectionPrefix: "_learn_",
-      installed: hasAllLearnCollections()
+      installed: hasAllLearnCollections(),
+      config: getDefaultModuleConfig(MODULE_SLUG_LEARN)
     }
   };
   const config = configs[slug];
@@ -403,6 +594,7 @@ function getOrCreateModuleRecord(slug) {
   moduleRecord.set("isMain", false);
   moduleRecord.set("routeBase", config.routeBase);
   moduleRecord.set("collectionPrefix", config.collectionPrefix);
+  moduleRecord.set("config", normalizeModuleConfig(slug, config.config));
   $app.save(moduleRecord);
   return moduleRecord;
 }
@@ -2276,10 +2468,13 @@ module.exports = {
   MODULE_SLUG_GALLERY,
   MODULE_SLUG_LEARN,
   COLLECTION_MODULES,
+  isSupportedModuleSlug,
   setCORSHeaders,
   requireAuth,
   ensureModulesCollectionAndSeed,
   getOrCreateModuleRecord,
+  ensureModuleConfigDefaults,
+  updateModuleConfig,
   ensureCollectionsForModule,
   purgeCollectionsForModule,
   clearMainModuleSelection

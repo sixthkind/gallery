@@ -72,6 +72,13 @@ const onUnsetMain = async (slug: string) => {
   }
 };
 
+const hasModuleSettings = (module: any) => {
+  if (module?.slug === "gallery" || module?.slug === "learn") {
+    return true;
+  }
+  return !!module?.config?.settings?.titleEditable;
+};
+
 onMounted(async () => {
   await refreshModules();
 });
@@ -126,6 +133,13 @@ onMounted(async () => {
                   >
                     Open
                   </a>
+                  <NuxtLink
+                    v-if="module.installed && hasModuleSettings(module)"
+                    :to="`/modules/${module.slug}`"
+                    class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800"
+                  >
+                    Settings
+                  </NuxtLink>
                   <button
                     v-if="module.installed && !module.isMain"
                     :disabled="activeSlug === module.slug"

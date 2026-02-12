@@ -6,8 +6,8 @@
 
           <div class="flex items-center gap-3">
             <div class="bg-white bg-opacity-90 hover:bg-opacity-70 flex backdrop-blur mt-3 rounded-lg border p-2 dark:bg-slate-900/70 dark:hover:bg-slate-900/80 dark:border-slate-700/60">
-              <a href="/">
-                <span class="font-bold text-primary">_</span><span class="font-bold text-slate-500 dark:text-slate-200">{{ sitename }}</span><span class="font-bold text-slate-500 opacity-80 dark:text-slate-300">{{ sitename2 }}</span>
+              <a :href="homePath">
+                <span class="font-bold text-primary">_</span><span class="font-bold text-slate-500 dark:text-slate-200">{{ activeModuleTitleText }}</span>
               </a>
             </div>
 
@@ -27,7 +27,7 @@
             </button>
 
             <!-- Gallery Action Icons (only show on gallery page) -->
-            <div v-if="pb.authStore.isValid && isGalleryPage && galleryState" class="flex items-center gap-2">
+            <div v-if="showGalleryActions" class="flex items-center gap-2">
               <!-- Upload Icon -->
               <button
                 @click="galleryState.toggleUpload()"
@@ -71,51 +71,23 @@
               </button> -->
             </div>
             <a
-              v-if="galleryInstalled"
-              :href="galleryMain ? '/albums' : '/gallery/albums'"
+              v-for="item in activeModuleDesktopButtons"
+              :key="item.path"
+              :href="item.path"
               class="hidden md:inline-flex items-center gap-2 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border px-3 py-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
-              title="Albums"
+              :title="item.title"
             >
-              <Icon name="heroicons:rectangle-stack" class="w-5 h-5 text-gray-700 dark:text-slate-200" />
-              <span class="font-bold text-slate-500 dark:text-slate-300">Albums</span>
-            </a>
-            <a
-              v-if="galleryInstalled"
-              :href="galleryMain ? '/tags' : '/gallery/tags'"
-              class="hidden md:inline-flex items-center gap-2 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border px-3 py-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
-              title="Tags"
-            >
-              <Icon name="heroicons:tag" class="w-5 h-5 text-gray-700 dark:text-slate-200" />
-              <span class="font-bold text-slate-500 dark:text-slate-300">Tags</span>
+              <Icon :name="item.icon" class="w-5 h-5 text-gray-700 dark:text-slate-200" />
+              <span class="font-bold text-slate-500 dark:text-slate-300">{{ item.title }}</span>
             </a>
 
             <a
-              v-if="learnInstalled"
-              :href="learnMain ? '/' : '/learn'"
+              href="/modules"
               class="hidden md:inline-flex items-center gap-2 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border px-3 py-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
-              title="Learn"
-            >
-              <Icon name="heroicons:academic-cap" class="w-5 h-5 text-gray-700 dark:text-slate-200" />
-              <span class="font-bold text-slate-500 dark:text-slate-300">Learn</span>
-            </a>
-
-            <a
-              v-if="learnInstalled && pb.authStore.isValid"
-              :href="learnMain ? '/enrollments' : '/learn/enrollments'"
-              class="hidden md:inline-flex items-center gap-2 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border px-3 py-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
-              title="Enrollments"
-            >
-              <Icon name="heroicons:book-open" class="w-5 h-5 text-gray-700 dark:text-slate-200" />
-              <span class="font-bold text-slate-500 dark:text-slate-300">Enrollments</span>
-            </a>
-
-            <a
-              href="/manage"
-              class="hidden md:inline-flex items-center gap-2 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border px-3 py-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
-              title="Manage"
+              title="Modules"
             >
               <Icon name="heroicons:cog-6-tooth" class="w-5 h-5 text-gray-700 dark:text-slate-200" />
-              <span class="font-bold text-slate-500 dark:text-slate-300">Manage</span>
+              <span class="font-bold text-slate-500 dark:text-slate-300">Modules</span>
             </a>
 
             <div v-if="pb.authStore.isValid" class="hidden md:flex bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 flex items-center dark:bg-slate-900/60 dark:border-slate-700/60">
@@ -176,38 +148,198 @@
 
 <script setup>
   import { pb } from "#imports";
-  import { useRoute } from 'vue-router';
-  
+  import { useRoute } from "vue-router";
+
   const route = useRoute();
   const colorMode = useColorMode();
-  const isDark = computed(() => colorMode.value === 'dark');
+  const isDark = computed(() => colorMode.value === "dark");
   const toggleDarkMode = () => {
-    colorMode.preference = isDark.value ? 'light' : 'dark';
+    colorMode.preference = isDark.value ? "light" : "dark";
   };
-  const config = useRuntimeConfig();
-  const sitename = ref(String(config.public.sitename));
-  const sitename2 = ref(String(config.public.sitename2));
-  if (sitename.value == '') {
-    sitename.value = 'ax';
-    sitename2.value = 'iom';
-  }
 
-  const email = ref(pb.authStore.record?.email || '');
+  const runtimeConfig = useRuntimeConfig();
+  const fallbackTitle = computed(() => {
+    const first = String(runtimeConfig.public.sitename || "").trim();
+    const second = String(runtimeConfig.public.sitename2 || "").trim();
+    return `${first}${second}`.trim() || "axiom";
+  });
 
-  const emailUsername = computed(() => email.value.split('@')[0]);
-  const emailDomain = computed(() => email.value.split('@')[1]);
+  const email = ref(pb.authStore.record?.email || "");
+  const emailUsername = computed(() => email.value.split("@")[0]);
+  const emailDomain = computed(() => email.value.split("@")[1]);
 
   const open = ref(false);
   const { modules, refreshModules, isInstalled } = useModules();
+
   const galleryInstalled = computed(() => isInstalled("gallery"));
   const galleryModule = computed(() => modules.value.find((module) => module.slug === "gallery"));
   const galleryMain = computed(() => !!galleryModule.value?.isMain);
+
   const learnInstalled = computed(() => isInstalled("learn"));
   const learnModule = computed(() => modules.value.find((module) => module.slug === "learn"));
   const learnMain = computed(() => !!learnModule.value?.isMain);
 
-  watch(() => pb.authStore.isValid, async (isValid) => {
-    if (!isValid) return;
+  const isRootGalleryRoute = (path) => {
+    return (
+      path === "/" ||
+      path === "/albums" ||
+      path.startsWith("/albums/") ||
+      path === "/tags" ||
+      path.startsWith("/tags/")
+    );
+  };
+
+  const isRootLearnRoute = (path) => {
+    return (
+      path === "/" ||
+      path === "/courses" ||
+      path.startsWith("/courses/") ||
+      path === "/enrollments" ||
+      path === "/subscribe" ||
+      path.startsWith("/subscribe/") ||
+      path.startsWith("/checkout/") ||
+      path.startsWith("/admin/")
+    );
+  };
+
+  const isLearnEditRoute = (path) => {
+    return (
+      path.startsWith("/edit/courses") ||
+      path.startsWith("/edit/sections") ||
+      path.startsWith("/edit/lessons") ||
+      path.startsWith("/edit/modules") ||
+      path.startsWith("/edit/subscription_tiers")
+    );
+  };
+
+  const extractPath = (value) => {
+    const raw = String(value || "");
+    return raw.split("?")[0].split("#")[0] || "/";
+  };
+
+  const activePath = computed(() => {
+    if (process.client) {
+      const browserPath = extractPath(
+        `${window.location.pathname}${window.location.search}${window.location.hash}`
+      );
+      if (browserPath) {
+        return browserPath;
+      }
+    }
+
+    return extractPath(route.fullPath || route.path);
+  });
+
+  const activeModuleSlug = computed(() => {
+    const path = activePath.value;
+
+    if (path === "/") {
+      if (learnMain.value && learnInstalled.value) return "learn";
+      if (galleryMain.value && galleryInstalled.value) return "gallery";
+      return null;
+    }
+
+    if (path === "/learn" || path.startsWith("/learn/")) return "learn";
+    if (path === "/gallery" || path.startsWith("/gallery/")) return "gallery";
+    if (isRootLearnRoute(path) || isLearnEditRoute(path)) return "learn";
+    if (isRootGalleryRoute(path)) return "gallery";
+
+    return null;
+  });
+
+  const activeModule = computed(() => {
+    if (!activeModuleSlug.value) return null;
+    return modules.value.find((module) => module.slug === activeModuleSlug.value) || null;
+  });
+
+  const normalizePath = (path) => {
+    const trimmed = typeof path === "string" ? path.trim() : "";
+    if (!trimmed || trimmed === "/") return "/";
+    return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  };
+
+  const moduleBasePath = (moduleRecord) => {
+    if (!moduleRecord) return "/";
+    if (moduleRecord.isMain) return "/";
+    const rawBase = typeof moduleRecord.routeBase === "string" ? moduleRecord.routeBase.trim() : "";
+    if (rawBase) {
+      return rawBase.startsWith("/") ? rawBase : `/${rawBase}`;
+    }
+    return `/${moduleRecord.slug}`;
+  };
+
+  const resolveModulePath = (moduleRecord, buttonPath) => {
+    const normalized = normalizePath(buttonPath);
+    if (!moduleRecord || moduleRecord.isMain) return normalized;
+    const base = moduleBasePath(moduleRecord);
+    if (normalized === "/") return base;
+    return `${base}${normalized}`;
+  };
+
+  const activeModuleTitleText = computed(() => {
+    const navbar = activeModule.value?.config?.navbar;
+    if (navbar && typeof navbar.titleText === "string" && navbar.titleText.trim()) {
+      return navbar.titleText.trim();
+    }
+    if (activeModule.value?.name) return activeModule.value.name;
+    return fallbackTitle.value;
+  });
+
+  const activeModuleDesktopButtons = computed(() => {
+    const moduleRecord = activeModule.value;
+    if (!moduleRecord) return [];
+
+    const buttons = Array.isArray(moduleRecord.config?.navbar?.buttons)
+      ? moduleRecord.config.navbar.buttons
+      : [];
+
+    return buttons
+      .filter((button) => {
+        if (!button || typeof button !== "object") return false;
+        if (button.requiresAuth === true && !pb.authStore.isValid) return false;
+        return typeof button.title === "string" && !!button.title.trim() &&
+          typeof button.path === "string" && !!button.path.trim();
+      })
+      .map((button) => ({
+        title: button.title.trim(),
+        path: resolveModulePath(moduleRecord, button.path),
+        icon: (typeof button.icon === "string" && button.icon.trim()) ? button.icon.trim() : "heroicons:link"
+      }));
+  });
+
+  const homePath = computed(() => {
+    const moduleRecord = activeModule.value;
+    if (!moduleRecord) return "/";
+    return moduleBasePath(moduleRecord);
+  });
+
+  const menuitems = computed(() => {
+    const items = [
+      {
+        title: "Home",
+        path: homePath.value,
+        icon: "heroicons:home"
+      },
+      ...activeModuleDesktopButtons.value
+    ];
+
+    if (pb.authStore.isValid) {
+      items.push({
+        title: "Modules",
+        path: "/modules",
+        icon: "heroicons:cog-6-tooth"
+      });
+      items.push({
+        title: "Profile",
+        path: "/profile",
+        icon: "heroicons:user-circle"
+      });
+    }
+
+    return items;
+  });
+
+  watch(() => pb.authStore.isValid, async () => {
     try {
       await refreshModules(true);
     } catch (error) {
@@ -215,84 +347,18 @@
     }
   }, { immediate: true });
 
-  const menuitems = computed(() => {
-    const items = [
-      {
-        title: "Home",
-        path: "/",
-        icon: "heroicons:home",
-      },
-      ...(galleryInstalled.value
-        ? [
-            {
-              title: "Albums",
-              path: galleryMain.value ? "/albums" : "/gallery/albums",
-              icon: "heroicons:rectangle-stack",
-            },
-            {
-              title: "Tags",
-              path: galleryMain.value ? "/tags" : "/gallery/tags",
-              icon: "heroicons:tag",
-            }
-          ]
-        : []),
-      ...(learnInstalled.value
-        ? [
-            {
-              title: "Learn",
-              path: learnMain.value ? "/" : "/learn",
-              icon: "heroicons:academic-cap",
-            },
-            ...(pb.authStore.isValid
-              ? [{
-                  title: "Enrollments",
-                  path: learnMain.value ? "/enrollments" : "/learn/enrollments",
-                  icon: "heroicons:book-open",
-                }]
-              : [])
-          ]
-        : [])
-    ];
-
-    if (pb.authStore.isValid) {
-      items.push({
-        title: "Manage",
-        path: "/manage",
-        icon: "heroicons:cog-6-tooth",
-      });
-      items.push({
-        title: "Profile",
-        path: "/profile",
-        icon: "heroicons:user-circle",
-      });
-    }
-
-    return items;
-  });
-
-  // Use shared gallery state composable (only on gallery page)
+  // Use shared gallery state composable (only when gallery is active).
   const isGalleryPage = computed(() => {
-    const isNestedGallery = route.path === '/gallery' || route.path.startsWith('/gallery/');
+    const path = activePath.value;
+    const isNestedGallery = path === "/gallery" || path.startsWith("/gallery/");
     if (!galleryMain.value) return isNestedGallery;
 
-    return isNestedGallery ||
-      route.path === '/' ||
-      route.path === '/albums' ||
-      route.path.startsWith('/albums/') ||
-      route.path === '/tags' ||
-      route.path.startsWith('/tags/');
+    return isNestedGallery || isRootGalleryRoute(path);
   });
   const galleryState = useGalleryState();
-
-  // Get layout icon based on current layout
-  const getLayoutIcon = (layout) => {
-    const layoutIcons = {
-      'masonry': 'heroicons:squares-2x2',
-      'grid': 'heroicons:squares-plus',
-      'tile': 'heroicons:rectangle-stack'
-    };
-    return layoutIcons[layout] || 'heroicons:squares-plus';
-  };
+  const showGalleryActions = computed(() => {
+    return pb.authStore.isValid && activeModuleSlug.value === "gallery" && isGalleryPage.value && !!galleryState;
+  });
 </script>
 
 <style scoped>
