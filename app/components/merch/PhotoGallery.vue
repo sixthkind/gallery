@@ -1405,12 +1405,10 @@ const handleItemClick = async (item) => {
       return;
     }
     
-    // If there are expanded groups and this group is not one of them, collapse all groups
+    // If another group is expanded, switch directly to the clicked group
     if (expandedGroups.value.size > 0 && !expandedGroups.value.has(item.id)) {
-      // Collapse all groups
       expandedGroups.value.clear();
       expandingGroupId.value = null;
-      return; // Don't expand the clicked group, just collapse
     }
     
     // Toggle group expansion
@@ -1999,6 +1997,7 @@ onMounted(() => {
   right: 0;
   height: 2rem;
   cursor: pointer;
+  z-index: 5;
 }
 
 .merch-dismiss-zone--top {
@@ -2007,7 +2006,8 @@ onMounted(() => {
 }
 
 .merch-dismiss-zone--bottom {
-  bottom: 0;
+  bottom: -35vh;
+  height: calc(35vh + 2rem);
 }
 
 .selection-actions {

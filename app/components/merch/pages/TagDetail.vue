@@ -8,6 +8,7 @@ import { useRoute, useRouter } from 'vue-router';
 
 const route = useRoute();
 const router = useRouter();
+const merchRef = ref(null);
 const tagName = computed(() => route.params.name);
 const tagRecord = ref(null);
 const tags = ref([]);
@@ -19,6 +20,9 @@ const isSuperuser = computed(() => authUtils.isSuperuser());
 const isDeletingTag = ref(false);
 const { toMerchPath } = useMerchRoutes();
 const { currentLayout } = useMerchState();
+const hasExpandedGroups = computed(() => {
+  return merchRef.value?.expandedGroups?.size > 0;
+});
 
 const fetchTag = async () => {
   if (!tagName.value) {
@@ -141,6 +145,12 @@ const deleteTag = async () => {
   await alert.present();
 };
 
+const collapseGroups = () => {
+  if (merchRef.value) {
+    merchRef.value.collapseAllGroups();
+  }
+};
+
 onMounted(() => {
   fetchTag();
   fetchTagsList();
@@ -162,78 +172,97 @@ watch(pendingTagName, () => {
 <template>
   <ion-page>
     <ion-content>
-      <CommonContainer>
-        <div class="flex items-center justify-between mt-4 mb-6">
-          <div class="flex items-center gap-2">
-            <button
-              class="text-gray-500 hover:text-gray-700 transition-colors mt-2"
-              @click="goBack"
-              aria-label="Back to tags"
-            >
-              <Icon name="heroicons:arrow-left" class="text-2xl" />
-            </button>
-            <span class="text-2xl font-bold text-gray-800"><span style="margin-right: -6px;">#</span></span>
-            <span v-if="!isEditingTag" class="text-2xl font-bold text-gray-800">
+      <div class="relative">
+        <div
+          v-if="hasExpandedGroups"
+          class="fixed left-0 top-0 bottom-0 cursor-pointer hover:bg-gray-100/30 transition-colors z-10"
+          style="width: calc((100vw - min(1280px, 100vw - 2.5rem)) / 2);"
+          @click.stop="collapseGroups"
+          title="Click to collapse groups"
+        ></div>
+
+        <div
+          v-if="hasExpandedGroups"
+          class="fixed right-0 top-0 bottom-0 cursor-pointer hover:bg-gray-100/30 transition-colors z-10"
+          style="width: calc((100vw - min(1280px, 100vw - 2.5rem)) / 2);"
+          @click.stop="collapseGroups"
+          title="Click to collapse groups"
+        ></div>
+
+        <CommonContainer>
+          <div class="flex items-center justify-between mt-4 mb-6">
+            <div class="flex items-center gap-2">
               <button
-                :class="isSuperuser ? 'cursor-pointer hover:text-gray-900' : ''"
-                @click="startTagEdit"
+                class="text-gray-500 hover:text-gray-700 transition-colors mt-2"
+                @click="goBack"
+                aria-label="Back to tags"
               >
-                {{ tagRecord?.name || tagName }}
+                <Icon name="heroicons:arrow-left" class="text-2xl" />
               </button>
-            </span>
-            <input
-              v-else
-              v-model="pendingTagName"
-              type="text"
-              maxlength="50"
-              class="text-2xl font-bold text-gray-800 bg-transparent border-b border-gray-300 focus:outline-none focus:border-blue-500"
-              @blur="stopTagEdit"
-              @keydown.enter.prevent="stopTagEdit"
-              @keydown.esc.prevent="stopTagEdit"
-              aria-label="Tag name"
+              <span class="text-2xl font-bold text-gray-800"><span style="margin-right: -6px;">#</span></span>
+              <span v-if="!isEditingTag" class="text-2xl font-bold text-gray-800">
+                <button
+                  :class="isSuperuser ? 'cursor-pointer hover:text-gray-900' : ''"
+                  @click="startTagEdit"
+                >
+                  {{ tagRecord?.name || tagName }}
+                </button>
+              </span>
+              <input
+                v-else
+                v-model="pendingTagName"
+                type="text"
+                maxlength="50"
+                class="text-2xl font-bold text-gray-800 bg-transparent border-b border-gray-300 focus:outline-none focus:border-blue-500"
+                @blur="stopTagEdit"
+                @keydown.enter.prevent="stopTagEdit"
+                @keydown.esc.prevent="stopTagEdit"
+                aria-label="Tag name"
+              />
+            </div>
+            <div class="flex items-center gap-3">
+              <button
+                v-if="isSuperuser"
+                @click="deleteTag"
+                :disabled="isDeletingTag"
+                class="bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors flex items-center gap-2"
+              >
+                <Icon
+                  v-if="isDeletingTag"
+                  name="svg-spinners:ring-resize"
+                  class="text-base"
+                />
+                <span>Delete Tag</span>
+              </button>
+              <button
+                v-if="nextTag"
+                class="flex items-center gap-2 text-gray-300 hover:text-gray-700 transition-colors"
+                @click="router.push(toMerchPath(`/tags/${encodeURIComponent(nextTag.name)}`))"
+                aria-label="Next tag"
+              >
+                <span class="text-lg font-semibold">#{{ nextTag.name }}</span>
+                <Icon name="heroicons:arrow-right" class="text-2xl" />
+              </button>
+            </div>
+          </div>
+
+          <div v-if="loading">
+            <MerchPhotoSkeletonGrid layout="grid" />
+          </div>
+          <div v-else-if="!tagRecord" class="text-center py-20 text-gray-500">
+            No products or photos with this tag.
+          </div>
+          <div v-else class="tag-merch-shell">
+            <MerchPhotoGallery
+              ref="merchRef"
+              :key="tagRecord.id"
+              :selection-mode="false"
+              :current-layout="currentLayout"
+              :tag-id="tagRecord.id"
             />
           </div>
-          <div class="flex items-center gap-3">
-            <button
-              v-if="isSuperuser"
-              @click="deleteTag"
-              :disabled="isDeletingTag"
-              class="bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors flex items-center gap-2"
-            >
-              <Icon
-                v-if="isDeletingTag"
-                name="svg-spinners:ring-resize"
-                class="text-base"
-              />
-              <span>Delete Tag</span>
-            </button>
-            <button
-              v-if="nextTag"
-              class="flex items-center gap-2 text-gray-300 hover:text-gray-700 transition-colors"
-              @click="router.push(toMerchPath(`/tags/${encodeURIComponent(nextTag.name)}`))"
-              aria-label="Next tag"
-            >
-              <span class="text-lg font-semibold">#{{ nextTag.name }}</span>
-              <Icon name="heroicons:arrow-right" class="text-2xl" />
-            </button>
-          </div>
-        </div>
-
-        <div v-if="loading">
-          <MerchPhotoSkeletonGrid layout="grid" />
-        </div>
-        <div v-else-if="!tagRecord" class="text-center py-20 text-gray-500">
-          No products or photos with this tag.
-        </div>
-        <div v-else class="tag-merch-shell">
-          <MerchPhotoGallery
-            :key="tagRecord.id"
-            :selection-mode="false"
-            :current-layout="currentLayout"
-            :tag-id="tagRecord.id"
-          />
-        </div>
-      </CommonContainer>
+        </CommonContainer>
+      </div>
     </ion-content>
   </ion-page>
 </template>
