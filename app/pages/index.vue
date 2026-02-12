@@ -6,6 +6,10 @@ definePageMeta({
 const { modules, refreshModules } = useModules();
 const loading = ref(true);
 
+const isLearnMain = computed(() => {
+  return modules.value.some((module) => module.slug === "learn" && module.installed && module.isMain);
+});
+
 const isGalleryMain = computed(() => {
   return modules.value.some((module) => module.slug === "gallery" && module.installed && module.isMain);
 });
@@ -20,7 +24,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <GalleryPagesMain v-if="isGalleryMain" />
+  <LearnPagesMain v-if="isLearnMain" />
+  <GalleryPagesMain v-else-if="isGalleryMain" />
 
   <ion-page v-else>
     <ion-content>

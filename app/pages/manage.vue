@@ -121,7 +121,7 @@ onMounted(async () => {
                 <div class="flex items-center gap-2">
                   <a
                     v-if="module.installed"
-                    :href="module.isMain ? '/' : (module.routeBase || '/gallery')"
+                    :href="module.isMain ? '/' : (module.routeBase || '/')"
                     class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800"
                   >
                     Open

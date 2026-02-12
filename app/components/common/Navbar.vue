@@ -90,6 +90,26 @@
             </a>
 
             <a
+              v-if="learnInstalled"
+              :href="learnMain ? '/' : '/learn'"
+              class="hidden md:inline-flex items-center gap-2 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border px-3 py-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
+              title="Learn"
+            >
+              <Icon name="heroicons:academic-cap" class="w-5 h-5 text-gray-700 dark:text-slate-200" />
+              <span class="font-bold text-slate-500 dark:text-slate-300">Learn</span>
+            </a>
+
+            <a
+              v-if="learnInstalled && pb.authStore.isValid"
+              :href="learnMain ? '/enrollments' : '/learn/enrollments'"
+              class="hidden md:inline-flex items-center gap-2 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border px-3 py-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
+              title="Enrollments"
+            >
+              <Icon name="heroicons:book-open" class="w-5 h-5 text-gray-700 dark:text-slate-200" />
+              <span class="font-bold text-slate-500 dark:text-slate-300">Enrollments</span>
+            </a>
+
+            <a
               href="/manage"
               class="hidden md:inline-flex items-center gap-2 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border px-3 py-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
               title="Manage"
@@ -138,7 +158,7 @@
             :class="{ block: open, hidden: !open }"
           >
           <ul class="flex flex-col lg:flex-row lg:gap-3">
-              <li v-for="item of menuitems" :key="item.link" class="text-center">
+              <li v-for="item of menuitems" :key="item.path" class="text-center">
                 <a
                   :href="item.path"
                   class="flex justify-center items-center gap-2 lg:px-3 py-2 text-gray-600 hover:text-gray-900 dark:text-slate-300 dark:hover:text-slate-100"
@@ -182,6 +202,9 @@
   const galleryInstalled = computed(() => isInstalled("gallery"));
   const galleryModule = computed(() => modules.value.find((module) => module.slug === "gallery"));
   const galleryMain = computed(() => !!galleryModule.value?.isMain);
+  const learnInstalled = computed(() => isInstalled("learn"));
+  const learnModule = computed(() => modules.value.find((module) => module.slug === "learn"));
+  const learnMain = computed(() => !!learnModule.value?.isMain);
 
   watch(() => pb.authStore.isValid, async (isValid) => {
     if (!isValid) return;
@@ -211,6 +234,22 @@
               path: galleryMain.value ? "/tags" : "/gallery/tags",
               icon: "heroicons:tag",
             }
+          ]
+        : []),
+      ...(learnInstalled.value
+        ? [
+            {
+              title: "Learn",
+              path: learnMain.value ? "/" : "/learn",
+              icon: "heroicons:academic-cap",
+            },
+            ...(pb.authStore.isValid
+              ? [{
+                  title: "Enrollments",
+                  path: learnMain.value ? "/enrollments" : "/learn/enrollments",
+                  icon: "heroicons:book-open",
+                }]
+              : [])
           ]
         : [])
     ];

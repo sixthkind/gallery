@@ -1,5 +1,5 @@
 import { pb } from "#imports";
-import { CORE_COLLECTIONS, GALLERY_COLLECTIONS } from "~/utils/collections";
+import { CORE_COLLECTIONS, GALLERY_COLLECTIONS, LEARN_COLLECTIONS } from "~/utils/collections";
 
 type ModuleRecord = {
   id: string;
@@ -28,6 +28,16 @@ const INSTALLABLE_MODULES: ModuleRecord[] = [
     isMain: false,
     routeBase: "/gallery",
     collectionPrefix: "gallery_"
+  },
+  {
+    id: "catalog-learn",
+    slug: "learn",
+    name: "Learn",
+    description: "E-learning courses module",
+    installed: false,
+    isMain: false,
+    routeBase: "/learn",
+    collectionPrefix: "_learn_"
   }
 ];
 
@@ -88,17 +98,31 @@ export const useModules = () => {
   };
 
   const fallbackFromCatalogProbe = async () => {
-    let installed = false;
+    let galleryInstalled = false;
+    let learnInstalled = false;
     try {
       await pb.collection(GALLERY_COLLECTIONS.photos).getList(1, 1, { fields: "id" });
-      installed = true;
+      galleryInstalled = true;
     } catch (error) {
-      installed = false;
+      galleryInstalled = false;
     }
 
-    return INSTALLABLE_MODULES.map((module) =>
-      module.slug === "gallery" ? { ...module, installed, isMain: false } : module
-    );
+    try {
+      await pb.collection(LEARN_COLLECTIONS.courses).getList(1, 1, { fields: "id" });
+      learnInstalled = true;
+    } catch (error) {
+      learnInstalled = false;
+    }
+
+    return INSTALLABLE_MODULES.map((module) => {
+      if (module.slug === "gallery") {
+        return { ...module, installed: galleryInstalled, isMain: false };
+      }
+      if (module.slug === "learn") {
+        return { ...module, installed: learnInstalled, isMain: false };
+      }
+      return module;
+    });
   };
 
   const refreshModules = async (force = false) => {
@@ -107,9 +131,27 @@ export const useModules = () => {
     }
 
     if (!pb.authStore.isValid) {
-      modules.value = [...INSTALLABLE_MODULES];
+      try {
+        modules.value = await fallbackFromCatalogProbe();
+        listError.value = null;
+      } catch (error: any) {
+        modules.value = [...INSTALLABLE_MODULES];
+        listError.value = "You must be signed in to load full module state.";
+      }
       loaded.value = true;
-      listError.value = "You must be signed in to load server module state.";
+      return modules.value;
+    }
+
+    const record: any = pb.authStore.record;
+    if (record?.collectionName === "_superusers") {
+      try {
+        modules.value = await fallbackFromModulesCollection();
+        listError.value = null;
+      } catch (error: any) {
+        modules.value = await fallbackFromCatalogProbe();
+        listError.value = null;
+      }
+      loaded.value = true;
       return modules.value;
     }
 

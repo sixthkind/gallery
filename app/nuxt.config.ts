@@ -50,7 +50,12 @@ export default defineNuxtConfig({
       pocketbaseURL: process.env.VITE_POCKETBASE_URL,
       openrouterAssetID: process.env.VITE_OPENROUTER_ASSET_ID,
       sitename: process.env.VITE_SITENAME,
-      sitename2: process.env.VITE_SITENAME2
+      sitename2: process.env.VITE_SITENAME2,
+      userEmail: process.env.VITE_USER_EMAIL,
+      userPw: process.env.VITE_USER_PW,
+      adminEmail: process.env.VITE_ADMIN_EMAIL,
+      adminPw: process.env.VITE_ADMIN_PW,
+      disableSubscriptions: process.env.VITE_DISABLE_SUBSCRIPTIONS === 'true'
     }
   },
 

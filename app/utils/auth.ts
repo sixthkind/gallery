@@ -7,7 +7,6 @@ class authUtils {
       password: string,
     }) {
     return new Promise(async (resolve, reject) => {
-      console.log('register', input);
       try {
         // Create a new user in the 'users' collection with the provided input data
         await pb.collection("users").create({
@@ -24,8 +23,6 @@ class authUtils {
           // Authenticate the user with the provided email and password
           await this.authenticate(input.email, input.password);
 
-          console.log('register success');
-
           // resolve this function
           resolve(true);
         } catch (error: any) {
@@ -41,6 +38,11 @@ class authUtils {
 
   static async authenticate(email: string, password: string) {
     const authData = await pb.collection('users').authWithPassword(email, password);
+    return authData;
+  }
+
+  static async authenticateAdmin(email: string, password: string) {
+    const authData = await pb.collection('_superusers').authWithPassword(email, password);
     return authData;
   }
 
@@ -75,7 +77,13 @@ class authUtils {
 
   static async refresh() {
     try {
-      await pb.collection('users').authRefresh();
+      // Check if current auth is for superuser or regular user
+      const record: any = pb.authStore.record;
+      if (record?.collectionName === '_superusers') {
+        await pb.collection('_superusers').authRefresh();
+      } else {
+        await pb.collection('users').authRefresh();
+      }
       return;
     } catch (error: any) {
       if(error.status === 401) {
@@ -100,6 +108,15 @@ class authUtils {
   static logout() {
     pb.authStore.clear();
     window.location.href = '/auth';
+  }
+
+  static isSuperuser() {
+    const record: any = pb.authStore.record;
+    return pb.authStore.isValid && record?.collectionName === '_superusers';
+  }
+
+  static isAdmin() {
+    return this.isSuperuser();
   }
 }
 

@@ -65,8 +65,10 @@
 <script setup>
   import { ref } from 'vue';
   import { pb, getSchema, Utils } from '#imports';
+  import { resolveEditCollection } from '~/utils/collections';
   import { useRoute } from 'vue-router';
   const route = useRoute();
+  const { toLearnPath } = useLearnRoutes();
   const isLoaded = ref(false);
   const isSuccess = ref(false);
   const isConfirm = ref(false);
@@ -75,6 +77,7 @@
 
   const type = route.params.type;
   const id = route.params.id;
+  const collectionName = resolveEditCollection(String(type));
 
   // the following are used when creating a new item and the item is related to another item
   const field = route.query.field; // the field that this item is occupying
@@ -83,27 +86,27 @@
   let prefill = route.query.prefill; // the id of the item that this item is related to
   if(prefill) prefill = JSON.parse(decodeURIComponent(prefill));
 
+  // Check if the type is in the array of non-deletable types
+  const isDeletionAllowed = !(await getSchema('notdeletable')).includes(type);
+  let formSchema = await getSchema(type);
+
   // the following is a query parameter to 'filter' the form to only show certain fields. This allows for more control over forms.
   const filter = route.query.filter;
   // Filter form fields by query params
   if(filter) {
-    let filterArray = filter.split(",");
+    let filterArray = String(filter).split(",");
     const filteredForm = Object.fromEntries(
       Object.entries(formSchema).filter(([key]) => filterArray.includes(key))
     );
     formSchema = filteredForm;
   }
-
-  // Check if the type is in the array of non-deletable types
-  const isDeletionAllowed = !(await getSchema('notdeletable')).includes(type);
-  let formSchema = await getSchema(type);
   const isError = ref(false);
   const errorMessage = ref('')
 
   const init = async () => {
     if (id) {
       // If there is an id, get the record
-      const record = await pb.collection(type).getOne(id);
+      const record = await pb.collection(collectionName).getOne(String(id));
       // Set the data to the record using schema keys
       populateFormData(record); 
     }
@@ -118,6 +121,16 @@
   const goBack = () => {
     if(type == 'users') {
       window.location.href = '/profile';
+    } else if (type === 'courses') {
+      window.location.href = toLearnPath('/admin/courses');
+    } else if (type === 'sections') {
+      window.location.href = toLearnPath('/admin/sections');
+    } else if (type === 'lessons') {
+      window.location.href = toLearnPath('/admin/lessons');
+    } else if (type === 'modules') {
+      window.location.href = toLearnPath('/admin/modules');
+    } else if (type === 'subscription_tiers') {
+      window.location.href = toLearnPath('/admin/subscription-tiers');
     } else {
       window.location.href = `/${type}`;
     }
@@ -246,7 +259,7 @@
     try {
       const formData = createSharedFormData();
       printFormData(formData);
-      await pb.collection(type).update(id, formData);
+      await pb.collection(collectionName).update(String(id), formData);
       showSuccess();
     } catch (error) {
       showError(error.message || 'Error updating item');
@@ -260,7 +273,7 @@
       // add user relation
       formData.append('user', pb.authStore.record?.id);
 
-      const record = await pb.collection(type).create(formData);
+      const record = await pb.collection(collectionName).create(formData);
 
       // the following adds a back-relation if needed (included in url query)
       if(field && collection && relationid) {
@@ -286,7 +299,7 @@
     }
 
     // Delete the item
-    await pb.collection(type).delete(id);
+    await pb.collection(collectionName).delete(String(id));
     goBack();
   }
 
