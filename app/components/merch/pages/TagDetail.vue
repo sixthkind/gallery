@@ -11,42 +11,28 @@ const router = useRouter();
 const tagName = computed(() => route.params.name);
 const tagRecord = ref(null);
 const tags = ref([]);
-const photos = ref([]);
 const loading = ref(true);
-const selectedPhoto = ref(null);
 const isEditingTag = ref(false);
 const pendingTagName = ref('');
 const saveTimer = ref(null);
 const isSuperuser = computed(() => authUtils.isSuperuser());
 const isDeletingTag = ref(false);
 const { toMerchPath } = useMerchRoutes();
+const { currentLayout } = useMerchState();
 
 const fetchTag = async () => {
   if (!tagName.value) {
     tagRecord.value = null;
-    photos.value = [];
     loading.value = false;
     return;
   }
   loading.value = true;
   try {
     tagRecord.value = await pb.collection(MERCH_COLLECTIONS.tags).getFirstListItem(`name = "${String(tagName.value).replace(/"/g, '\\"')}"`);
-    const tagId = tagRecord.value.id;
     pendingTagName.value = tagRecord.value?.name || '';
-    const allTagged = await pb.collection(MERCH_COLLECTIONS.photos).getFullList({
-      sort: '-dateTaken,-created',
-      expand: 'tags'
-    });
-    photos.value = allTagged.filter(photo => {
-      if (Array.isArray(photo.tags)) {
-        return photo.tags.includes(tagId);
-      }
-      return false;
-    });
   } catch (error) {
-    console.error('Error fetching tag photos:', error);
+    console.error('Error fetching tag:', error);
     tagRecord.value = null;
-    photos.value = [];
   } finally {
     loading.value = false;
   }
@@ -78,16 +64,6 @@ const nextTag = computed(() => {
   const nextIndex = (index + 1) % tags.value.length;
   return tags.value[nextIndex] ?? null;
 });
-
-const openLightbox = (photo) => {
-  selectedPhoto.value = photo;
-};
-
-const closeLightbox = () => {
-  selectedPhoto.value = null;
-};
-
-const allPhotosForLightbox = computed(() => photos.value);
 
 const startTagEdit = async () => {
   if (!isSuperuser.value) return;
@@ -163,36 +139,6 @@ const deleteTag = async () => {
     ]
   });
   await alert.present();
-};
-
-const navigateLightbox = (direction) => {
-  const list = allPhotosForLightbox.value;
-  const index = list.findIndex(p => p.id === selectedPhoto.value?.id);
-  if (index === -1) return;
-  const nextIndex = direction === 'next'
-    ? (index + 1) % list.length
-    : (index - 1 + list.length) % list.length;
-  selectedPhoto.value = list[nextIndex];
-};
-
-const handleTagsUpdated = ({ photoId, tags }) => {
-  const tagIds = tags.map(tag => tag.id);
-  photos.value = photos.value
-    .map(photo => {
-      if (photo.id !== photoId) return photo;
-      return {
-        ...photo,
-        tags: tagIds,
-        expand: {
-          ...photo.expand,
-          tags
-        }
-      };
-    })
-    .filter(photo => {
-      if (!tagRecord.value) return true;
-      return photo.tags?.includes(tagRecord.value.id);
-    });
 };
 
 onMounted(() => {
@@ -276,39 +222,18 @@ watch(pendingTagName, () => {
         <div v-if="loading">
           <MerchPhotoSkeletonGrid layout="grid" />
         </div>
-        <div v-else-if="photos.length === 0" class="text-center py-20 text-gray-500">
-          No photos with this tag.
+        <div v-else-if="!tagRecord" class="text-center py-20 text-gray-500">
+          No products or photos with this tag.
         </div>
         <div v-else class="tag-merch-shell">
-          <MerchPhotoGridLayout
-            :items="photos"
-            layout="grid"
+          <MerchPhotoGallery
+            :key="tagRecord.id"
             :selection-mode="false"
-            :selected-photos="[]"
-            @photo-click="openLightbox"
-          >
-            <template #photo-item="{ item, getPhotoUrl }">
-              <div class="relative overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 aspect-square">
-                <img
-                  :src="getPhotoUrl(item, '500x500')"
-                  :alt="item.title || 'Photo'"
-                  class="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              </div>
-            </template>
-          </MerchPhotoGridLayout>
+            :current-layout="currentLayout"
+            :tag-id="tagRecord.id"
+          />
         </div>
       </CommonContainer>
-
-      <MerchPhotoLightbox
-        v-if="selectedPhoto"
-        :photo="selectedPhoto"
-        :photos="allPhotosForLightbox"
-        @close="closeLightbox"
-        @navigate="navigateLightbox"
-        @tags-updated="handleTagsUpdated"
-      />
     </ion-content>
   </ion-page>
 </template>

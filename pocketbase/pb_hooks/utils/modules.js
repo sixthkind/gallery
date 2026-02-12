@@ -1526,6 +1526,22 @@ function buildMerchProductsCollection() {
     }));
   }
 
+  if (!collection.fields.getByName("tags")) {
+    collection.fields.addAt(10, new Field({
+      "cascadeDelete": false,
+      "collectionId": MERCH_TAGS_ID,
+      "hidden": false,
+      "id": "relation_merch_tg",
+      "maxSelect": 999,
+      "minSelect": 0,
+      "name": "tags",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "relation"
+    }));
+  }
+
   return collection;
 }
 
@@ -2618,29 +2634,31 @@ function purgeGalleryCollections() {
 }
 
 function ensureMerchCollections() {
-  const tags = findCollectionSafe(MERCH_TAGS);
-  const photos = findCollectionSafe(MERCH_PHOTOS);
-  const products = findCollectionSafe(MERCH_PRODUCTS);
-  const albums = findCollectionSafe(MERCH_ALBUMS);
+  const hasAllCollections = !!(
+    findCollectionSafe(MERCH_TAGS) &&
+    findCollectionSafe(MERCH_PHOTOS) &&
+    findCollectionSafe(MERCH_PRODUCTS) &&
+    findCollectionSafe(MERCH_ALBUMS)
+  );
 
-  if (tags && photos && products && albums) {
-    return;
+  if (!hasAllCollections) {
+    // Remove partial state before recreating in a deterministic order.
+    dropCollectionByName(MERCH_PRODUCTS);
+    dropCollectionByName(MERCH_ALBUMS);
+    dropCollectionByName(MERCH_PHOTOS);
+    dropCollectionByName(MERCH_TAGS);
+
+    $app.save(buildMerchTagsCollection());
+    $app.save(buildMerchPhotosCollectionWithoutProductAlbum());
+    $app.save(buildMerchAlbumsCollection());
+    $app.save(buildMerchProductsCollection());
   }
 
-  // Remove partial state before recreating in a deterministic order.
-  dropCollectionByName(MERCH_PRODUCTS);
-  dropCollectionByName(MERCH_ALBUMS);
-  dropCollectionByName(MERCH_PHOTOS);
-  dropCollectionByName(MERCH_TAGS);
-
-  $app.save(buildMerchTagsCollection());
-  $app.save(buildMerchPhotosCollectionWithoutProductAlbum());
-  $app.save(buildMerchAlbumsCollection());
-  $app.save(buildMerchProductsCollection());
-
   const photosCollection = $app.findCollectionByNameOrId(MERCH_PHOTOS_ID);
+  let shouldSavePhotos = false;
 
-  if (!photosCollection.fields.getByName("product")) {
+  const productField = photosCollection.fields.getByName("product");
+  if (!productField) {
     photosCollection.fields.addAt(6, new Field({
       "cascadeDelete": false,
       "collectionId": MERCH_PRODUCTS_ID,
@@ -2654,9 +2672,14 @@ function ensureMerchCollections() {
       "system": false,
       "type": "relation"
     }));
+    shouldSavePhotos = true;
+  } else if (productField.collectionId !== MERCH_PRODUCTS_ID) {
+    productField.collectionId = MERCH_PRODUCTS_ID;
+    shouldSavePhotos = true;
   }
 
-  if (!photosCollection.fields.getByName("album")) {
+  const albumField = photosCollection.fields.getByName("album");
+  if (!albumField) {
     photosCollection.fields.addAt(7, new Field({
       "cascadeDelete": false,
       "collectionId": MERCH_ALBUMS_ID,
@@ -2670,9 +2693,51 @@ function ensureMerchCollections() {
       "system": false,
       "type": "relation"
     }));
+    shouldSavePhotos = true;
+  } else if (albumField.collectionId !== MERCH_ALBUMS_ID) {
+    albumField.collectionId = MERCH_ALBUMS_ID;
+    shouldSavePhotos = true;
   }
 
-  $app.save(photosCollection);
+  if (shouldSavePhotos) {
+    $app.save(photosCollection);
+  }
+
+  const productsCollection = $app.findCollectionByNameOrId(MERCH_PRODUCTS_ID);
+  let shouldSaveProducts = false;
+  const productsTagsField = productsCollection.fields.getByName("tags");
+  if (!productsTagsField) {
+    productsCollection.fields.addAt(10, new Field({
+      "cascadeDelete": false,
+      "collectionId": MERCH_TAGS_ID,
+      "hidden": false,
+      "id": "relation_merch_tg",
+      "maxSelect": 999,
+      "minSelect": 0,
+      "name": "tags",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "relation"
+    }));
+    shouldSaveProducts = true;
+  } else if (productsTagsField.collectionId !== MERCH_TAGS_ID) {
+    productsTagsField.collectionId = MERCH_TAGS_ID;
+    shouldSaveProducts = true;
+  }
+
+  if (!Array.isArray(productsCollection.indexes)) {
+    productsCollection.indexes = [];
+    shouldSaveProducts = true;
+  }
+  if (!productsCollection.indexes.some((index) => String(index).includes("idx_merch_products_slug"))) {
+    productsCollection.indexes.push(`CREATE UNIQUE INDEX idx_merch_products_slug ON ${MERCH_PRODUCTS} (slug)`);
+    shouldSaveProducts = true;
+  }
+
+  if (shouldSaveProducts) {
+    $app.save(productsCollection);
+  }
 }
 
 function purgeMerchCollections() {

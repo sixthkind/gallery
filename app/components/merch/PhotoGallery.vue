@@ -106,7 +106,7 @@
 
     <!-- Empty State -->
     <div v-else-if="unifiedItems.length === 0" class="text-center py-20">
-      <p class="text-gray-500 text-lg">No photos yet. Upload your first photo above!</p>
+      <p class="text-gray-500 text-lg">{{ emptyStateMessage }}</p>
     </div>
 
     <!-- Merch Content -->
@@ -318,6 +318,10 @@ const props = defineProps({
     type: String,
     default: null
   },
+  tagId: {
+    type: String,
+    default: null
+  },
   minLoadingMs: {
     type: Number,
     default: 0
@@ -345,6 +349,11 @@ const groupCount = computed(() => groups.value.length);
 const areAllGroupsExpanded = computed(() => {
   return groupCount.value > 0 && expandedGroups.value.size === groupCount.value;
 });
+const emptyStateMessage = computed(() => (
+  props.tagId
+    ? 'No products or photos with this tag.'
+    : 'No photos yet. Upload your first photo above!'
+));
 
 const getPhotoDateValue = (photo) => {
   const value = photo?.dateTaken || photo?.created || 0;
@@ -376,6 +385,12 @@ const comparePhotoDate = (a, b) => {
 const compareItemDate = (a, b) => {
   const diff = getItemDateValue(b) - getItemDateValue(a);
   return props.dateSortDirection === 'asc' ? -diff : diff;
+};
+
+const hasTag = (record, tagId) => {
+  if (!record || !tagId) return false;
+  const tagValues = Array.isArray(record.tags) ? record.tags : [];
+  return tagValues.includes(tagId);
 };
 
 const setItemSortOrder = (itemId, isGroup, sortOrder) => {
@@ -495,31 +510,57 @@ const fetchPhotos = async () => {
   try {
     const albumFilter = props.albumId
       ? `album = "${props.albumId}"`
-      : '(album = "" || album = null || favorite = true)';
+      : (props.tagId ? null : '(album = "" || album = null || favorite = true)');
     // Fetch all photos
-    const allPhotos = await pb.collection(MERCH_COLLECTIONS.photos).getFullList({
+    const photoQuery = {
       sort: props.dateSortDirection === 'asc' ? 'dateTaken,created' : '-dateTaken,-created',
-      expand: 'tags,product',
-      filter: albumFilter
-    });
+      expand: 'tags,product'
+    };
+    if (albumFilter) {
+      photoQuery.filter = albumFilter;
+    }
+    const allPhotos = await pb.collection(MERCH_COLLECTIONS.photos).getFullList(photoQuery);
     
     // Fetch groups with expanded relations
-    const allGroups = await pb.collection(MERCH_COLLECTIONS.groups).getFullList({
+    const groupQuery = {
       sort: '-created',
-      expand: 'coverPhoto,photos,photos.tags,user',
-      filter: albumFilter
-    });
+      expand: 'coverPhoto,photos,photos.tags,user,tags'
+    };
+    if (albumFilter) {
+      groupQuery.filter = albumFilter;
+    }
+    const allGroups = await pb.collection(MERCH_COLLECTIONS.groups).getFullList(groupQuery);
     
-    groups.value = allGroups;
-    
-    // Filter out photos that are in groups
-    // In the main merch (no albumId), favorited photos from groups also appear as standalone
-    // In album pages, all grouped photos stay within their groups
-    photos.value = allPhotos.filter(photo => {
-      if (!photo.product) return true; // Not in a group - always include
-      if (props.albumId) return false; // In album page - grouped photos stay in groups only
-      return photo.favorite; // Main merch - include favorited photos from groups
-    });
+    if (props.tagId) {
+      groups.value = allGroups.filter((group) => {
+        if (hasTag(group, props.tagId)) return true;
+        const groupPhotos = Array.isArray(group.expand?.photos) ? group.expand.photos : [];
+        return groupPhotos.some((photo) => hasTag(photo, props.tagId));
+      });
+
+      const groupedPhotoIds = new Set(
+        groups.value.flatMap((group) => {
+          const groupPhotos = Array.isArray(group.expand?.photos) ? group.expand.photos : [];
+          return groupPhotos.map((photo) => photo.id);
+        })
+      );
+
+      photos.value = allPhotos.filter((photo) => {
+        if (!hasTag(photo, props.tagId)) return false;
+        return !groupedPhotoIds.has(photo.id);
+      });
+    } else {
+      groups.value = allGroups;
+
+      // Filter out photos that are in groups
+      // In the main merch (no albumId), favorited photos from groups also appear as standalone
+      // In album pages, all grouped photos stay within their groups
+      photos.value = allPhotos.filter(photo => {
+        if (!photo.product) return true; // Not in a group - always include
+        if (props.albumId) return false; // In album page - grouped photos stay in groups only
+        return photo.favorite; // Main merch - include favorited photos from groups
+      });
+    }
 
     const itemsForOrdering = [
       ...photos.value.map(photo => ({ ...photo, isGroup: false })),
@@ -1136,6 +1177,25 @@ watch(() => props.selectionMode, (newValue, oldValue) => {
     expandedGroupsBeforeSelection.value = new Set(); // Clear the saved state
   }
 });
+
+watch(
+  () => [props.tagId, props.albumId, props.dateSortDirection],
+  (nextValue, previousValue) => {
+    if (
+      previousValue &&
+      nextValue[0] === previousValue[0] &&
+      nextValue[1] === previousValue[1] &&
+      nextValue[2] === previousValue[2]
+    ) {
+      return;
+    }
+    expandedGroups.value.clear();
+    expandingGroupId.value = null;
+    clearSelectionState();
+    loading.value = true;
+    fetchPhotos();
+  }
+);
 
 // Clear selection
 const clearSelection = () => {
