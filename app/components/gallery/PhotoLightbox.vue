@@ -243,6 +243,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'navigate', 'tags-updated']);
 
 const router = useRouter();
+const { toGalleryPath } = useGalleryRoutes();
 const tags = ref([]);
 const tagInput = ref('');
 const isMetadataExpanded = ref(false);
@@ -475,7 +476,7 @@ const removeTag = async (tag) => {
 const openTag = (tag) => {
   if (!tag?.name) return;
   close();
-  router.push(`/gallery/tags/${encodeURIComponent(tag.name)}`);
+  router.push(toGalleryPath(`/tags/${encodeURIComponent(tag.name)}`));
 };
 
 const loadFullSize = () => {

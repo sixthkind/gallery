@@ -80,6 +80,15 @@ migrate((app) => {
         "type": "bool"
       },
       {
+        "hidden": false,
+        "id": "boolmod00000007",
+        "name": "isMain",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "bool"
+      },
+      {
         "autogeneratePattern": "",
         "hidden": false,
         "id": "textmod00000005",
@@ -137,6 +146,7 @@ migrate((app) => {
   galleryModule.set("name", "Gallery");
   galleryModule.set("description", "Photo gallery module");
   galleryModule.set("installed", true);
+  galleryModule.set("isMain", false);
   galleryModule.set("routeBase", "/gallery");
   galleryModule.set("collectionPrefix", "gallery_");
 

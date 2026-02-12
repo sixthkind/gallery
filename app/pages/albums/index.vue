@@ -1,9 +1,9 @@
 <script setup>
 definePageMeta({
-  middleware: ["auth", "gallery-module"]
+  middleware: ["auth", "main-gallery"]
 });
 </script>
 
 <template>
-  <GalleryPagesTags />
+  <GalleryPagesAlbums />
 </template>

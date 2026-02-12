@@ -173,6 +173,15 @@ function buildModulesCollection() {
         "type": "bool"
       },
       {
+        "hidden": false,
+        "id": "boolmod00000007",
+        "name": "isMain",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "bool"
+      },
+      {
         "autogeneratePattern": "",
         "hidden": false,
         "id": "textmod00000005",
@@ -233,6 +242,19 @@ function ensureModulesCollectionAndSeed() {
     $app.save(modulesCollection);
   }
 
+  if (!modulesCollection.fields.getByName("isMain")) {
+    modulesCollection.fields.addAt(5, new Field({
+      "hidden": false,
+      "id": "boolmod00000007",
+      "name": "isMain",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "bool"
+    }));
+    $app.save(modulesCollection);
+  }
+
   let galleryModule = findModuleBySlugSafe(MODULE_SLUG_GALLERY);
   if (!galleryModule) {
     galleryModule = new Record(modulesCollection);
@@ -240,8 +262,12 @@ function ensureModulesCollectionAndSeed() {
     galleryModule.set("name", "Gallery");
     galleryModule.set("description", "Photo gallery module");
     galleryModule.set("installed", hasAllGalleryCollections());
+    galleryModule.set("isMain", false);
     galleryModule.set("routeBase", "/gallery");
     galleryModule.set("collectionPrefix", "gallery_");
+    $app.save(galleryModule);
+  } else if (galleryModule.get("isMain") === null || galleryModule.get("isMain") === undefined) {
+    galleryModule.set("isMain", false);
     $app.save(galleryModule);
   }
 
@@ -259,6 +285,7 @@ function getOrCreateGalleryModuleRecord() {
   galleryModule.set("name", "Gallery");
   galleryModule.set("description", "Photo gallery module");
   galleryModule.set("installed", hasAllGalleryCollections());
+  galleryModule.set("isMain", false);
   galleryModule.set("routeBase", "/gallery");
   galleryModule.set("collectionPrefix", "gallery_");
   $app.save(galleryModule);
@@ -1034,6 +1061,21 @@ function purgeGalleryCollections() {
   dropCollectionByName(GALLERY_TAGS);
 }
 
+function clearMainModuleSelection() {
+  const records = $app.findRecordsByFilter(
+    COLLECTION_MODULES,
+    "isMain = true",
+    "name",
+    200,
+    0
+  );
+
+  for (const record of records) {
+    record.set("isMain", false);
+    $app.save(record);
+  }
+}
+
 routerAdd("OPTIONS", "/api/modules", (e) => {
   setCORSHeaders(e);
   return e.noContent(204);
@@ -1069,6 +1111,7 @@ routerAdd("GET", "/api/modules", (e) => {
       name: record.get("name"),
       description: record.get("description"),
       installed: !!record.get("installed"),
+      isMain: !!record.get("isMain"),
       routeBase: record.get("routeBase"),
       collectionPrefix: record.get("collectionPrefix"),
       created: record.get("created"),
@@ -1102,7 +1145,8 @@ routerAdd("POST", "/api/modules/{slug}/install", (e) => {
 
     return e.json(200, {
       slug,
-      installed: true
+      installed: true,
+      isMain: !!moduleRecord.get("isMain")
     });
   } catch (error) {
     const message = error.message || "Failed to install module";
@@ -1126,15 +1170,78 @@ routerAdd("POST", "/api/modules/{slug}/uninstall", (e) => {
     purgeGalleryCollections();
     if (moduleRecord.get("installed")) {
       moduleRecord.set("installed", false);
+      if (moduleRecord.get("isMain")) {
+        moduleRecord.set("isMain", false);
+      }
       $app.save(moduleRecord);
     }
 
     return e.json(200, {
       slug,
-      installed: false
+      installed: false,
+      isMain: false
     });
   } catch (error) {
     const message = error.message || "Failed to uninstall module";
+    const status = /auth|token|authorization/i.test(message) ? 401 : 400;
+    return e.json(status, { error: message });
+  }
+});
+
+routerAdd("POST", "/api/modules/{slug}/set-main", (e) => {
+  setCORSHeaders(e);
+  try {
+    requireAuth(e);
+    const slug = e.request.pathValue("slug");
+
+    if (slug !== MODULE_SLUG_GALLERY) {
+      return e.json(400, { error: "Unknown module slug" });
+    }
+
+    const moduleRecord = getOrCreateGalleryModuleRecord();
+    if (!moduleRecord.get("installed")) {
+      return e.json(400, { error: "Module must be installed before it can be set as main" });
+    }
+
+    clearMainModuleSelection();
+    moduleRecord.set("isMain", true);
+    $app.save(moduleRecord);
+
+    return e.json(200, {
+      slug,
+      installed: true,
+      isMain: true
+    });
+  } catch (error) {
+    const message = error.message || "Failed to set main module";
+    const status = /auth|token|authorization/i.test(message) ? 401 : 400;
+    return e.json(status, { error: message });
+  }
+});
+
+routerAdd("POST", "/api/modules/{slug}/unset-main", (e) => {
+  setCORSHeaders(e);
+  try {
+    requireAuth(e);
+    const slug = e.request.pathValue("slug");
+
+    if (slug !== MODULE_SLUG_GALLERY) {
+      return e.json(400, { error: "Unknown module slug" });
+    }
+
+    const moduleRecord = getOrCreateGalleryModuleRecord();
+    if (moduleRecord.get("isMain")) {
+      moduleRecord.set("isMain", false);
+      $app.save(moduleRecord);
+    }
+
+    return e.json(200, {
+      slug,
+      installed: !!moduleRecord.get("installed"),
+      isMain: false
+    });
+  } catch (error) {
+    const message = error.message || "Failed to unset main module";
     const status = /auth|token|authorization/i.test(message) ? 401 : 400;
     return e.json(status, { error: message });
   }

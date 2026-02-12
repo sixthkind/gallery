@@ -7,6 +7,7 @@ type ModuleRecord = {
   name: string;
   description?: string;
   installed: boolean;
+  isMain: boolean;
   routeBase?: string;
   collectionPrefix?: string;
   created?: string;
@@ -24,6 +25,7 @@ const INSTALLABLE_MODULES: ModuleRecord[] = [
     name: "Gallery",
     description: "Photo gallery module",
     installed: false,
+    isMain: false,
     routeBase: "/gallery",
     collectionPrefix: "gallery_"
   }
@@ -54,7 +56,13 @@ export const useModules = () => {
     const bySlug = new Map(records.map((record) => [record.slug, record]));
     return INSTALLABLE_MODULES.map((module) => {
       const existing = bySlug.get(module.slug);
-      return existing ? { ...module, ...existing } : module;
+      if (!existing) return module;
+      const merged = { ...module, ...existing };
+      return {
+        ...merged,
+        installed: !!merged.installed,
+        isMain: !!merged.isMain
+      };
     });
   };
 
@@ -69,6 +77,7 @@ export const useModules = () => {
       name: String(record.name),
       description: record.description ? String(record.description) : "",
       installed: !!record.installed,
+      isMain: !!record.isMain,
       routeBase: record.routeBase ? String(record.routeBase) : "",
       collectionPrefix: record.collectionPrefix ? String(record.collectionPrefix) : "",
       created: record.created,
@@ -88,7 +97,7 @@ export const useModules = () => {
     }
 
     return INSTALLABLE_MODULES.map((module) =>
-      module.slug === "gallery" ? { ...module, installed } : module
+      module.slug === "gallery" ? { ...module, installed, isMain: false } : module
     );
   };
 
@@ -145,6 +154,36 @@ export const useModules = () => {
     await refreshModules(true);
   };
 
+  const setMainModule = async (slug: string) => {
+    try {
+      await callModulesAPI(`/api/modules/${encodeURIComponent(slug)}/set-main`, "POST");
+    } catch (error) {
+      const records = await pb.collection(CORE_COLLECTIONS.modules).getFullList();
+      const target = records.find((record: any) => String(record.slug) === slug);
+      if (!target) throw error;
+      if (!target.installed) {
+        throw new Error("Module must be installed before it can be set as main");
+      }
+      await Promise.all(records.map((record: any) =>
+        pb.collection(CORE_COLLECTIONS.modules).update(record.id, { isMain: false })
+      ));
+      await pb.collection(CORE_COLLECTIONS.modules).update(target.id, { isMain: true });
+    }
+    await refreshModules(true);
+  };
+
+  const unsetMainModule = async (slug: string) => {
+    try {
+      await callModulesAPI(`/api/modules/${encodeURIComponent(slug)}/unset-main`, "POST");
+    } catch (error) {
+      const records = await pb.collection(CORE_COLLECTIONS.modules).getFullList();
+      const target = records.find((record: any) => String(record.slug) === slug);
+      if (!target) throw error;
+      await pb.collection(CORE_COLLECTIONS.modules).update(target.id, { isMain: false });
+    }
+    await refreshModules(true);
+  };
+
   return {
     modules,
     loading,
@@ -153,6 +192,8 @@ export const useModules = () => {
     refreshModules,
     isInstalled,
     installModule,
-    uninstallModule
+    uninstallModule,
+    setMainModule,
+    unsetMainModule
   };
 };

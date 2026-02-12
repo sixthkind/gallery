@@ -72,7 +72,7 @@
             </div>
             <a
               v-if="galleryInstalled"
-              href="/gallery/albums"
+              :href="galleryMain ? '/albums' : '/gallery/albums'"
               class="hidden md:inline-flex items-center gap-2 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border px-3 py-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
               title="Albums"
             >
@@ -81,12 +81,21 @@
             </a>
             <a
               v-if="galleryInstalled"
-              href="/gallery/tags"
+              :href="galleryMain ? '/tags' : '/gallery/tags'"
               class="hidden md:inline-flex items-center gap-2 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border px-3 py-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
               title="Tags"
             >
               <Icon name="heroicons:tag" class="w-5 h-5 text-gray-700 dark:text-slate-200" />
               <span class="font-bold text-slate-500 dark:text-slate-300">Tags</span>
+            </a>
+
+            <a
+              href="/manage"
+              class="hidden md:inline-flex items-center gap-2 bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border px-3 py-2 hover:bg-opacity-90 transition-colors dark:bg-slate-900/60 dark:hover:bg-slate-900/80 dark:border-slate-700/60"
+              title="Manage"
+            >
+              <Icon name="heroicons:cog-6-tooth" class="w-5 h-5 text-gray-700 dark:text-slate-200" />
+              <span class="font-bold text-slate-500 dark:text-slate-300">Manage</span>
             </a>
 
             <div v-if="pb.authStore.isValid" class="hidden md:flex bg-white bg-opacity-70 backdrop-blur mt-3 rounded-lg border p-2 flex items-center dark:bg-slate-900/60 dark:border-slate-700/60">
@@ -169,8 +178,10 @@
   const emailDomain = computed(() => email.value.split('@')[1]);
 
   const open = ref(false);
-  const { refreshModules, isInstalled } = useModules();
+  const { modules, refreshModules, isInstalled } = useModules();
   const galleryInstalled = computed(() => isInstalled("gallery"));
+  const galleryModule = computed(() => modules.value.find((module) => module.slug === "gallery"));
+  const galleryMain = computed(() => !!galleryModule.value?.isMain);
 
   watch(() => pb.authStore.isValid, async (isValid) => {
     if (!isValid) return;
@@ -192,12 +203,12 @@
         ? [
             {
               title: "Albums",
-              path: "/gallery/albums",
+              path: galleryMain.value ? "/albums" : "/gallery/albums",
               icon: "heroicons:rectangle-stack",
             },
             {
               title: "Tags",
-              path: "/gallery/tags",
+              path: galleryMain.value ? "/tags" : "/gallery/tags",
               icon: "heroicons:tag",
             }
           ]
@@ -205,6 +216,11 @@
     ];
 
     if (pb.authStore.isValid) {
+      items.push({
+        title: "Manage",
+        path: "/manage",
+        icon: "heroicons:cog-6-tooth",
+      });
       items.push({
         title: "Profile",
         path: "/profile",
@@ -216,7 +232,17 @@
   });
 
   // Use shared gallery state composable (only on gallery page)
-  const isGalleryPage = computed(() => route.path === '/gallery' || route.path.startsWith('/gallery/'));
+  const isGalleryPage = computed(() => {
+    const isNestedGallery = route.path === '/gallery' || route.path.startsWith('/gallery/');
+    if (!galleryMain.value) return isNestedGallery;
+
+    return isNestedGallery ||
+      route.path === '/' ||
+      route.path === '/albums' ||
+      route.path.startsWith('/albums/') ||
+      route.path === '/tags' ||
+      route.path.startsWith('/tags/');
+  });
   const galleryState = useGalleryState();
 
   // Get layout icon based on current layout
